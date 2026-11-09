@@ -408,7 +408,7 @@
         isRoomHost = true;
         peerConnections = [];
         
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const peerId = 'dam-ular-' + roomId;
           
           if (peerInstance) {
@@ -433,7 +433,6 @@
           peerInstance.on('connection', (conn) => {
             peerConnections.push(conn);
             conn.on('open', () => {
-              // Hantar data bilik semasa kepada client yang baru join
               conn.send({ type: 'ROOM_STATE', payload: window.getRoomState() });
             });
             conn.on('data', (msg) => {
@@ -443,7 +442,6 @@
                 }
               } else if (msg && msg.type === 'ACTION') {
                 onClientUpdate(msg.payload);
-                // Broadcast ke semua client lain
                 window.OnlineMultiplayer.broadcast(msg.payload);
               }
             });
@@ -454,7 +452,6 @@
 
           peerInstance.on('error', (err) => {
             console.warn("PeerJS Host Error:", err);
-            // Tetap izinkan main melalui cross-tab
             resolve(true);
           });
         });
@@ -462,7 +459,7 @@
 
       connectToRoom(roomId, onDataReceived) {
         isRoomHost = false;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const peerId = 'dam-ular-client-' + Math.floor(1000 + Math.random() * 9000);
           
           if (peerInstance) {
@@ -480,7 +477,6 @@
           });
 
           let timeout = setTimeout(() => {
-            // Jika masa sambungan awan melebihi 4 saat, semak sama ada ada tab host setempat
             resolve(true);
           }, 3500);
 
@@ -512,7 +508,6 @@
       },
 
       broadcast(payload) {
-        // Hantar ke semua sambungan WebRTC
         if (isRoomHost) {
           peerConnections.forEach(conn => {
             if (conn.open) {
@@ -523,7 +518,6 @@
           try { hostConnection.send({ type: 'ACTION', payload }); } catch(e){}
         }
 
-        // Segerakkan ke tab/tetingkap setempat juga
         if (crossTabChannel && currentRoomId) {
           try {
             crossTabChannel.postMessage({ roomId: currentRoomId, payload });
@@ -840,6 +834,7 @@
 
     function renderScoreboards() {
       const container = document.getElementById('multiplayerBar');
+      if (!container) return;
       container.innerHTML = '';
 
       players.forEach((p, idx) => {
@@ -879,6 +874,7 @@
 
     function updateTurnBanner() {
       const banner = document.getElementById('activePlayerTurnBanner');
+      if (!banner) return;
       const p = players[currentPlayerIndex] || players[0];
       const isMyTurn = (gameMode === 'offline') || (gameMode === 'online' && currentPlayerIndex === myPlayerIndex);
 
@@ -893,24 +889,25 @@
       }
 
       const rollBtn = document.getElementById('rollDiceBtn');
-      if (gameMode === 'online') {
-        if (!isMyTurn || isRolling || currentQuestion !== null) {
-          rollBtn.disabled = true;
-          rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
-        } else {
+      if (rollBtn) {
+        if (gameMode === 'online') {
+          if (!isMyTurn || isRolling || currentQuestion !== null) {
+            rollBtn.disabled = true;
+            rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
+          } else {
+            rollBtn.disabled = false;
+            rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+          }
+        } else if (!isRolling && currentQuestion === null) {
           rollBtn.disabled = false;
           rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
         }
-      } else if (!isRolling && currentQuestion === null) {
-        rollBtn.disabled = false;
-        rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
       }
 
       renderScoreboards();
     }
 
     function nextTurn() {
-      // Jika dalam talian dan bukan host, abaikan kerana Host akan selaraskan
       if (gameMode === 'online' && !isRoomHost) {
         return;
       }
@@ -944,11 +941,13 @@
     let selectedOfflineCount = 2;
 
     function openLobbyModal() {
-      document.getElementById('lobbyModal').classList.remove('hidden');
+      const modal = document.getElementById('lobbyModal');
+      if (modal) modal.classList.remove('hidden');
     }
 
     function closeLobbyModal() {
-      document.getElementById('lobbyModal').classList.add('hidden');
+      const modal = document.getElementById('lobbyModal');
+      if (modal) modal.classList.add('hidden');
     }
 
     function switchLobbyTab(tab) {
@@ -956,6 +955,8 @@
       const onTabBtn = document.getElementById('tabOnlineBtn');
       const offContent = document.getElementById('tabOfflineContent');
       const onContent = document.getElementById('tabOnlineContent');
+
+      if (!offTabBtn || !onTabBtn) return;
 
       if (tab === 'offline') {
         offTabBtn.className = 'py-2.5 px-3 rounded-xl font-bungee text-xs sm:text-sm bg-slate-900 text-yellow-400 border-2 border-slate-900';
@@ -974,6 +975,7 @@
       selectedOfflineCount = count;
       [2, 3, 4].forEach(n => {
         const btn = document.getElementById(`quickP${n}`);
+        if (!btn) return;
         if (n === count) {
           btn.className = 'py-2 rounded-xl font-bungee text-xs border-2 border-slate-800 bg-emerald-500 text-white';
         } else {
@@ -1003,6 +1005,7 @@
 
     function showOnlineStatus(msg, isSuccess = false) {
       const box = document.getElementById('onlineStatusMessage');
+      if (!box) return;
       box.classList.remove('hidden');
       box.className = `mt-2 p-2 rounded-xl text-[11px] font-bold text-center border ${
         isSuccess ? 'bg-emerald-100 text-emerald-800 border-emerald-400' : 'bg-red-100 text-red-800 border-red-400'
@@ -1086,11 +1089,7 @@
           handleOnlineRoomUpdate(data);
         });
 
-        // Set bilik sementara dengan pemain sendiri dahulu, tunggu senarai rasmi dari Host
-        const tempPlayer = {
-          name: name,
-          email: email
-        };
+        const tempPlayer = { name: name, email: email };
 
         if (hostConnection && hostConnection.open) {
           hostConnection.send({ type: 'PLAYER_JOIN', player: tempPlayer });
@@ -1112,7 +1111,6 @@
       }
     }
 
-    // Host menguruskan kemasukan pemain sebenar tanpa pemain hantu / dummy
     window.handlePlayerJoinRequest = function(joiningPlayer, conn = null) {
       if (!isRoomHost) return;
 
@@ -1148,7 +1146,6 @@
       renderAllPlayers();
       updateTurnBanner();
 
-      // Hantar senarai pemain rasmi terkini ke semua peranti
       syncOnlineRoom({
         players: players,
         totalPlayers: players.length,
@@ -1181,25 +1178,21 @@
     window.handleOnlineRoomUpdate = function(data) {
       if (!data) return;
 
-      // Jika mesej kemasukan pemain diterima melalui tab tempatan
       if (data.type === 'PLAYER_JOIN' && isRoomHost) {
         window.handlePlayerJoinRequest(data.player);
         return;
       }
 
-      // Pemain menjawab soalan (dikendalikan oleh Host jika diterima daripada Client)
       if (data.actionType === 'ANSWER_CHOSEN' && isRoomHost) {
-        executeRemoteAnswer(data.selectedAnswer, data.playerIndex);
+        executeRemoteAnswer(data.selectedAnswer, data.playerIndex, data.steps);
         return;
       }
 
-      // Dadu diputar oleh pemain lain
       if (data.actionType === 'DICE_ROLLED') {
         applyRemoteDiceRoll(data.val1, data.val2, data.sum, data.playerIndex);
         return;
       }
 
-      // Animasi pergerakan langkah dari Host ke Client
       if (data.actionType === 'PLAYER_MOVED') {
         if (players[data.playerIndex]) {
           animatePlayerSteps(data.playerIndex, data.fromPos, data.toPos);
@@ -1211,7 +1204,8 @@
         players = data.players;
         totalPlayers = data.players.length;
 
-        const myEmail = document.getElementById('onlinePlayerEmail').value.trim().toLowerCase();
+        const emailInput = document.getElementById('onlinePlayerEmail');
+        const myEmail = emailInput ? emailInput.value.trim().toLowerCase() : '';
         const foundIdx = players.findIndex(p => p.email && p.email.toLowerCase() === myEmail);
         if (foundIdx !== -1) {
           myPlayerIndex = foundIdx;
@@ -1219,7 +1213,6 @@
         }
       }
 
-      // Selaraskan giliran secara mutlak mengikut data Host
       if (typeof data.currentPlayerIndex === 'number') {
         currentPlayerIndex = data.currentPlayerIndex;
       }
@@ -1281,12 +1274,13 @@
       }
     }
 
-    function executeRemoteAnswer(selectedAnswer, pIdx) {
+    function executeRemoteAnswer(selectedAnswer, pIdx, stepsFromClient) {
       if (pIdx !== currentPlayerIndex || !currentQuestion) return;
       
       const isCorrect = (selectedAnswer === currentQuestion.correct);
       const activePlayer = players[currentPlayerIndex];
       activePlayer.totalQuestions++;
+      const stepsToMove = (typeof stepsFromClient === 'number' && stepsFromClient > 0) ? stepsFromClient : pendingSteps;
 
       if (isCorrect) {
         activePlayer.correctQuestions++;
@@ -1294,10 +1288,10 @@
         activePlayer.score += earnedScore;
         renderScoreboards();
         spawnConfetti(20);
-        addLog(`✅ <b>TEPAT! ${activePlayer.name}</b> menjawab betul (+${earnedScore}). Melangkah ${pendingSteps} petak!`, 'text-emerald-400');
+        addLog(`✅ <b>TEPAT! ${activePlayer.name}</b> menjawab betul (+${earnedScore}). Melangkah ${stepsToMove} petak!`, 'text-emerald-400');
         
         setTimeout(() => {
-          advancePlayer(pendingSteps);
+          advancePlayer(stepsToMove);
         }, 800);
       } else {
         const penalty = 15;
@@ -1315,9 +1309,9 @@
     /* ========================================================
        3. BOARD SETUP & RESPONSIVE CANVAS
        ======================================================== */
-    const gridContainer = document.getElementById('gridContainer');
-    const boardCanvas = document.getElementById('boardCanvas');
-    const ctx = boardCanvas.getContext('2d');
+    let gridContainer = null;
+    let boardCanvas = null;
+    let ctx = null;
 
     const TILE_COLORS = [
       'bg-red-500', 'bg-blue-500', 'bg-emerald-500', 
@@ -1325,6 +1319,11 @@
     ];
 
     function createBoardGrid() {
+      gridContainer = document.getElementById('gridContainer');
+      boardCanvas = document.getElementById('boardCanvas');
+      if (!gridContainer || !boardCanvas) return;
+      ctx = boardCanvas.getContext('2d');
+
       gridContainer.innerHTML = '';
       
       for (let r = 9; r >= 0; r--) {
@@ -1362,7 +1361,7 @@
 
     function getTileCenter(tileNum) {
       const tileEl = document.getElementById(`tile-${tileNum}`);
-      if (!tileEl) return { x: 0, y: 0 };
+      if (!tileEl || !boardCanvas) return { x: 0, y: 0 };
       const rect = tileEl.getBoundingClientRect();
       const canvasRect = boardCanvas.getBoundingClientRect();
       return {
@@ -1372,6 +1371,7 @@
     }
 
     function resizeCanvasAndRedraw() {
+      if (!boardCanvas || !boardCanvas.parentElement) return;
       const rect = boardCanvas.parentElement.getBoundingClientRect();
       boardCanvas.width = rect.width;
       boardCanvas.height = rect.height;
@@ -1379,6 +1379,7 @@
     }
 
     function drawSnakesAndLadders() {
+      if (!ctx || !boardCanvas) return;
       ctx.clearRect(0, 0, boardCanvas.width, boardCanvas.height);
 
       // Draw Ladders
@@ -1524,6 +1525,7 @@
        ======================================================== */
     function spawnRobloxPopup(text, isPositive, targetElem = null) {
       const container = document.getElementById('particleContainer');
+      if (!container) return;
       const popup = document.createElement('div');
       popup.className = `float-text ${isPositive ? 'text-yellow-300' : 'text-red-500'}`;
       popup.textContent = text;
@@ -1553,6 +1555,7 @@
 
     function spawnConfetti(count = 25) {
       const container = document.getElementById('particleContainer');
+      if (!container) return;
       const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#ffffff'];
       for (let i = 0; i < count; i++) {
         const p = document.createElement('div');
@@ -1583,6 +1586,7 @@
 
     function addLog(message, colorClass = 'text-slate-300') {
       const log = document.getElementById('gameLog');
+      if (!log) return;
       const item = document.createElement('div');
       item.className = colorClass;
       item.innerHTML = message;
@@ -1594,6 +1598,7 @@
        ======================================================== */
     function renderDiceFace(elementId, value) {
       const dieEl = document.getElementById(elementId);
+      if (!dieEl) return;
       dieEl.dataset.val = value;
       dieEl.innerHTML = '';
       const pattern = DICE_PATTERNS[value] || [];
@@ -1609,9 +1614,6 @@
       }
     }
 
-    renderDiceFace('dice1', 3);
-    renderDiceFace('dice2', 4);
-
     function handleRollDice() {
       if (gameMode === 'online' && currentPlayerIndex !== myPlayerIndex) {
         return;
@@ -1625,13 +1627,15 @@
       initAudio();
       isRolling = true;
       const rollBtn = document.getElementById('rollDiceBtn');
-      rollBtn.disabled = true;
-      rollBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      if (rollBtn) {
+        rollBtn.disabled = true;
+        rollBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
 
       const dice1El = document.getElementById('dice1');
       const dice2El = document.getElementById('dice2');
-      dice1El.classList.add('rolling');
-      dice2El.classList.add('rolling');
+      if (dice1El) dice1El.classList.add('rolling');
+      if (dice2El) dice2El.classList.add('rolling');
 
       let rollCount = 0;
       const rollInterval = setInterval(() => {
@@ -1645,8 +1649,8 @@
 
         if (rollCount > 10) {
           clearInterval(rollInterval);
-          dice1El.classList.remove('rolling');
-          dice2El.classList.remove('rolling');
+          if (dice1El) dice1El.classList.remove('rolling');
+          if (dice2El) dice2El.classList.remove('rolling');
 
           const val1 = Math.floor(Math.random() * 6) + 1;
           const val2 = Math.floor(Math.random() * 6) + 1;
@@ -1656,15 +1660,17 @@
           playDiceLand();
 
           pendingSteps = val1 + val2;
-          document.getElementById('diceSumText').innerHTML = 
-            `Jumlah Langkah: <span class="text-blue-600 font-black text-xl animate-bounce inline-block">${val1} + ${val2} = ${pendingSteps}</span>`;
+          const sumEl = document.getElementById('diceSumText');
+          if (sumEl) {
+            sumEl.innerHTML = 
+              `Jumlah Langkah: <span class="text-blue-600 font-black text-xl animate-bounce inline-block">${val1} + ${val2} = ${pendingSteps}</span>`;
+          }
 
           const curPlayer = players[currentPlayerIndex];
           addLog(`🎲 <b>${curPlayer.name}</b> memutar: [${val1}] + [${val2}] = <b>${pendingSteps} Langkah</b>!`, curPlayer.textClass);
 
           isRolling = false;
 
-          // Jika Client dalam talian memutar dadu, siarkan data dadu kepada Host
           if (gameMode === 'online') {
             window.OnlineMultiplayer.broadcast({
               actionType: 'DICE_ROLLED',
@@ -1893,7 +1899,6 @@
 
       const isCorrect = (selectedAnswer === currentQuestion.correct);
 
-      // Jika Client dalam mod online (bukan host), hantar jawapan ke Host dan TUNGGU arahan Host
       if (gameMode === 'online' && !isRoomHost) {
         if (isCorrect) {
           buttonElement.classList.remove('bg-slate-100', 'hover:bg-yellow-200');
@@ -1910,12 +1915,13 @@
         window.OnlineMultiplayer.broadcast({
           actionType: 'ANSWER_CHOSEN',
           selectedAnswer: selectedAnswer,
-          playerIndex: myPlayerIndex
+          playerIndex: myPlayerIndex,
+          steps: pendingSteps
         });
-        return; // Hentikan di sini untuk Client, jangan panggil advancePlayer sendiri!
+        return;
       }
 
-      // Bahagian di bawah ini hanya dijalankan oleh Host atau dalam Mod Offline:
+      // Bahagian di bawah dijalankan oleh Host atau Mod Offline
       activePlayer.totalQuestions++;
 
       if (isCorrect) {
@@ -1932,7 +1938,7 @@
         playSuccessChime();
         spawnConfetti(20);
 
-        addLog(`✅ <b>TEPAT! ${activePlayer.name}</b> menjawab dengan betul. Skor +${earnedScore}. Melangkah ${pendingSteps} petak!`, 'text-emerald-400');
+        addLog(`✅ <b>TEPAT! ${activePlayer.name}</b> menjawab betul (+${earnedScore}). Melangkah ${pendingSteps} petak!`, 'text-emerald-400');
 
         setTimeout(() => {
           advancePlayer(pendingSteps);
@@ -1967,7 +1973,6 @@
 
     function handleTimeOut() {
       if (gameMode === 'online' && !isRoomHost) {
-        // Biarkan Host yang menguruskan penalti masa tamat
         return;
       }
 
@@ -1995,12 +2000,14 @@
 
       const isMyTurn = (gameMode === 'offline') || (gameMode === 'online' && currentPlayerIndex === myPlayerIndex);
       const rollBtn = document.getElementById('rollDiceBtn');
-      if (isMyTurn) {
-        rollBtn.disabled = false;
-        rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
-      } else {
-        rollBtn.disabled = true;
-        rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      if (rollBtn) {
+        if (isMyTurn) {
+          rollBtn.disabled = false;
+          rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+        } else {
+          rollBtn.disabled = true;
+          rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
+        }
       }
     }
 
@@ -2031,7 +2038,6 @@
       const startPos = activePlayer.position;
       const targetPos = Math.min(BOARD_SIZE, startPos + steps);
 
-      // Siarkan tindakan mula gerak kepada semua peranti agar animasi berjalan serentak
       if (gameMode === 'online') {
         window.OnlineMultiplayer.broadcast({
           actionType: 'PLAYER_MOVED',
@@ -2083,96 +2089,103 @@
           renderAllPlayers();
           if (gameMode === 'online') syncOnlineRoom();
           checkWinCondition();
-        }, 650);
+        }, 500);
         return;
       }
 
-      if (gameMode === 'online') syncOnlineRoom();
       checkWinCondition();
     }
 
     function checkWinCondition() {
       const activePlayer = players[currentPlayerIndex];
       if (activePlayer.position >= BOARD_SIZE) {
-        activePlayer.position = BOARD_SIZE;
-        renderAllPlayers();
         triggerVictory(activePlayer);
-
-        if (gameMode === 'online') {
-          syncOnlineRoom({
-            gameEnded: true,
-            winner: activePlayer
-          });
-        }
-      } else {
-        resetQuestionCardState();
-        nextTurn();
+        return;
       }
+
+      resetQuestionCardState();
+      nextTurn();
     }
 
     function triggerVictory(winner) {
-      spawnConfetti(60);
+      clearInterval(timerInterval);
       playVictoryTrumpet();
-      const accuracy = winner.totalQuestions > 0 
+      spawnConfetti(60);
+
+      const modal = document.getElementById('victoryModal');
+      const title = document.getElementById('winnerTitle');
+      const subtitle = document.getElementById('winnerSubtitle');
+      const finalScore = document.getElementById('finalScore');
+      const accuracy = document.getElementById('accuracyStats');
+
+      if (title) title.textContent = `${winner.name.toUpperCase()} MENANG!`;
+      if (subtitle) subtitle.textContent = `Hebat! ${winner.name} berjaya sampai ke Petak 100 dahulu!`;
+      if (finalScore) finalScore.textContent = winner.score;
+      
+      const accRate = winner.totalQuestions > 0 
         ? Math.round((winner.correctQuestions / winner.totalQuestions) * 100) 
         : 100;
+      if (accuracy) accuracy.textContent = `Ketepatan Menjawab: ${accRate}% (${winner.correctQuestions}/${winner.totalQuestions} Soalan)`;
 
-      document.getElementById('winnerTitle').textContent = `${winner.name.toUpperCase()} MENANG!`;
-      document.getElementById('winnerSubtitle').textContent = `Tahniah ${winner.name}! Berjaya sampai ke Petak 100!`;
-      document.getElementById('finalScore').textContent = winner.score;
-      document.getElementById('accuracyStats').textContent = 
-        `Ketepatan Math: ${accuracy}% (${winner.correctQuestions}/${winner.totalQuestions} Soalan Betul)`;
+      if (modal) modal.classList.remove('hidden');
 
-      document.getElementById('victoryModal').classList.remove('hidden');
+      if (gameMode === 'online' && isRoomHost) {
+        syncOnlineRoom({
+          gameEnded: true,
+          winner: winner
+        });
+      }
     }
 
-    function resetGame(fullReset = true) {
+    function resetGame(shouldCloseVictory = true) {
       clearInterval(timerInterval);
-      if (fullReset) {
-        initializePlayers(totalPlayers);
-      } else {
-        players.forEach(p => {
-          p.position = 1;
-          p.score = 100;
-          p.totalQuestions = 0;
-          p.correctQuestions = 0;
-        });
-        currentPlayerIndex = 0;
+      if (shouldCloseVictory) {
+        const modal = document.getElementById('victoryModal');
+        if (modal) modal.classList.add('hidden');
       }
 
-      isRolling = false;
-      pendingSteps = 0;
-      currentQuestion = null;
+      players.forEach(p => {
+        p.position = 1;
+        p.score = 100;
+        p.totalQuestions = 0;
+        p.correctQuestions = 0;
+      });
 
-      renderAllPlayers();
+      currentPlayerIndex = 0;
+      isRolling = false;
       resetQuestionCardState();
+      renderDiceFace('dice1', 1);
+      renderDiceFace('dice2', 1);
+      renderScoreboards();
+      renderAllPlayers();
       updateTurnBanner();
 
-      document.getElementById('victoryModal').classList.add('hidden');
-      document.getElementById('gameLog').innerHTML = `
-        <div class="text-yellow-300">★ Permainan baru dimulakan! Sedia putarkan 2 dadu anda.</div>
-      `;
-      resizeCanvasAndRedraw();
-      playSuccessChime();
+      const log = document.getElementById('gameLog');
+      if (log) log.innerHTML = '<div class="text-yellow-300">★ Permainan telah dimulakan semula! Putar dadu untuk mula.</div>';
 
-      if (gameMode === 'online') {
-        syncOnlineRoom({ gameEnded: false, winner: null });
+      if (gameMode === 'online' && isRoomHost) {
+        syncOnlineRoom({ gameEnded: false });
       }
     }
 
     /* ========================================================
-       8. INITIALIZATION & WINDOW EVENTS
+       8. INITIALIZATION ON WINDOW LOAD
        ======================================================== */
-    window.onload = function () {
-      initializePlayers(2);
+    window.onload = function() {
       createBoardGrid();
-      resizeCanvasAndRedraw();
+      initializePlayers(2);
+      renderDiceFace('dice1', 1);
+      renderDiceFace('dice2', 1);
 
       window.addEventListener('resize', () => {
         resizeCanvasAndRedraw();
+        renderAllPlayers();
       });
 
-      setTimeout(openLobbyModal, 400);
+      // Tunggu lukisan layout selesai sebelum mengira kedudukan tangga & ular
+      setTimeout(() => {
+        resizeCanvasAndRedraw();
+      }, 250);
     };
   </script>
 </body>
