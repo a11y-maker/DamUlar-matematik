@@ -893,9 +893,14 @@
       }
 
       const rollBtn = document.getElementById('rollDiceBtn');
-      if (gameMode === 'online' && !isMyTurn) {
-        rollBtn.disabled = true;
-        rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      if (gameMode === 'online') {
+        if (!isMyTurn || isRolling || currentQuestion !== null) {
+          rollBtn.disabled = true;
+          rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
+        } else {
+          rollBtn.disabled = false;
+          rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+        }
       } else if (!isRolling && currentQuestion === null) {
         rollBtn.disabled = false;
         rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
@@ -905,12 +910,17 @@
     }
 
     function nextTurn() {
+      // Jika dalam talian dan bukan host, jangan tukar giliran sendiri; tunggu data rasmi daripada Host
+      if (gameMode === 'online' && !isRoomHost) {
+        return;
+      }
+
       currentPlayerIndex = (currentPlayerIndex + 1) % totalPlayers;
       updateTurnBanner();
       addLog(`👉 Giliran berpindah kepada <b>${players[currentPlayerIndex].name}</b>!`, 'text-yellow-200');
       playRobloxBeep(480, 0.08);
 
-      if (gameMode === 'online') {
+      if (gameMode === 'online' && isRoomHost) {
         syncOnlineRoom();
       }
     }
@@ -1086,7 +1096,6 @@
           hostConnection.send({ type: 'PLAYER_JOIN', player: tempPlayer });
         }
 
-        // Hantar juga melalui Cross-Tab sekiranya diuji pada peranti yang sama
         if (crossTabChannel) {
           crossTabChannel.postMessage({
             roomId: code,
@@ -1142,7 +1151,8 @@
       // Hantar senarai pemain rasmi terkini ke semua peranti
       syncOnlineRoom({
         players: players,
-        totalPlayers: players.length
+        totalPlayers: players.length,
+        currentPlayerIndex: currentPlayerIndex
       });
     };
 
@@ -1151,7 +1161,6 @@
       currentRoomId = roomId;
       myPlayerIndex = playerIdx;
       
-      // Jika playerIdx sah, tetapkan pemain
       if (playerIdx >= 0) {
         totalPlayers = initialPlayers.length;
         players = initialPlayers;
@@ -1178,11 +1187,22 @@
         return;
       }
 
+      // Pemain menjawab soalan (dikendalikan oleh Host jika diterima daripada Client)
+      if (data.actionType === 'ANSWER_CHOSEN' && isRoomHost) {
+        executeRemoteAnswer(data.selectedAnswer, data.playerIndex);
+        return;
+      }
+
+      // Dadu diputar oleh pemain lain
+      if (data.actionType === 'DICE_ROLLED') {
+        applyRemoteDiceRoll(data.val1, data.val2, data.sum, data.playerIndex);
+        return;
+      }
+
       if (data.players && Array.isArray(data.players)) {
         players = data.players;
         totalPlayers = data.players.length;
 
-        // Kemas kini indeks pemain saya berdasarkan e-mel yang didaftarkan
         const myEmail = document.getElementById('onlinePlayerEmail').value.trim().toLowerCase();
         const foundIdx = players.findIndex(p => p.email && p.email.toLowerCase() === myEmail);
         if (foundIdx !== -1) {
@@ -1191,10 +1211,28 @@
         }
       }
 
-      if (data.currentQuestion && (!currentQuestion || currentQuestion.text !== data.currentQuestion.text)) {
-        currentQuestion = data.currentQuestion;
-        displayQuestionCard();
-      } else if (!data.currentQuestion && currentQuestion) {
+      // Selaraskan giliran secara mutlak mengikut data Host
+      if (typeof data.currentPlayerIndex === 'number') {
+        currentPlayerIndex = data.currentPlayerIndex;
+      }
+
+      if (typeof data.pendingSteps === 'number') {
+        pendingSteps = data.pendingSteps;
+      }
+
+      if (data.dice1 && data.dice2) {
+        renderDiceFace('dice1', data.dice1);
+        renderDiceFace('dice2', data.dice2);
+        document.getElementById('diceSumText').innerHTML = 
+          `Jumlah Langkah: <span class="text-blue-600 font-black text-xl">${data.dice1} + ${data.dice2} = ${data.dice1 + data.dice2}</span>`;
+      }
+
+      if (data.currentQuestion) {
+        if (!currentQuestion || currentQuestion.text !== data.currentQuestion.text) {
+          currentQuestion = data.currentQuestion;
+          displayQuestionCard();
+        }
+      } else if (data.currentQuestion === null && currentQuestion) {
         resetQuestionCardState();
       }
 
@@ -1221,6 +1259,49 @@
         ...customPayload
       };
       window.OnlineMultiplayer.broadcast(payload);
+    }
+
+    function applyRemoteDiceRoll(val1, val2, sum, pIdx) {
+      renderDiceFace('dice1', val1);
+      renderDiceFace('dice2', val2);
+      playDiceLand();
+      pendingSteps = sum;
+      document.getElementById('diceSumText').innerHTML = 
+        `Jumlah Langkah: <span class="text-blue-600 font-black text-xl animate-bounce inline-block">${val1} + ${val2} = ${sum}</span>`;
+      if (players[pIdx]) {
+        addLog(`🎲 <b>${players[pIdx].name}</b> memutar: [${val1}] + [${val2}] = <b>${sum} Langkah</b>!`, players[pIdx].textClass);
+      }
+    }
+
+    function executeRemoteAnswer(selectedAnswer, pIdx) {
+      if (pIdx !== currentPlayerIndex || !currentQuestion) return;
+      
+      const isCorrect = (selectedAnswer === currentQuestion.correct);
+      const activePlayer = players[currentPlayerIndex];
+      activePlayer.totalQuestions++;
+
+      if (isCorrect) {
+        activePlayer.correctQuestions++;
+        const earnedScore = 25;
+        activePlayer.score += earnedScore;
+        renderScoreboards();
+        spawnConfetti(20);
+        addLog(`✅ <b>TEPAT! ${activePlayer.name}</b> menjawab betul (+${earnedScore}). Melangkah ${pendingSteps} petak!`, 'text-emerald-400');
+        
+        setTimeout(() => {
+          advancePlayer(pendingSteps);
+        }, 800);
+      } else {
+        const penalty = 15;
+        activePlayer.score = Math.max(0, activePlayer.score - penalty);
+        renderScoreboards();
+        addLog(`❌ <b>SALAH! ${activePlayer.name}</b> gagal. Jawapan: <b>${currentQuestion.correct}</b>. (-${penalty} Robux)`, 'text-red-400');
+
+        setTimeout(() => {
+          resetQuestionCardState();
+          nextTurn();
+        }, 1600);
+      }
     }
 
     /* ========================================================
@@ -1574,6 +1655,18 @@
           addLog(`🎲 <b>${curPlayer.name}</b> memutar: [${val1}] + [${val2}] = <b>${pendingSteps} Langkah</b>!`, curPlayer.textClass);
 
           isRolling = false;
+
+          // Jika Client dalam talian memutar dadu, siarkan data dadu kepada Host
+          if (gameMode === 'online') {
+            window.OnlineMultiplayer.broadcast({
+              actionType: 'DICE_ROLLED',
+              val1: val1,
+              val2: val2,
+              sum: pendingSteps,
+              playerIndex: myPlayerIndex
+            });
+          }
+
           generateMathQuestion(val1, val2);
         }
       }, 70);
@@ -1794,6 +1887,15 @@
 
       const isCorrect = (selectedAnswer === currentQuestion.correct);
 
+      // Jika Client dalam mod online, hantar jawapan ke Host
+      if (gameMode === 'online' && !isRoomHost) {
+        window.OnlineMultiplayer.broadcast({
+          actionType: 'ANSWER_CHOSEN',
+          selectedAnswer: selectedAnswer,
+          playerIndex: myPlayerIndex
+        });
+      }
+
       if (isCorrect) {
         activePlayer.correctQuestions++;
         buttonElement.classList.remove('bg-slate-100', 'hover:bg-yellow-200');
@@ -1868,7 +1970,10 @@
       const rollBtn = document.getElementById('rollDiceBtn');
       if (isMyTurn) {
         rollBtn.disabled = false;
-        rollBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        rollBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+      } else {
+        rollBtn.disabled = true;
+        rollBtn.classList.add('opacity-40', 'cursor-not-allowed');
       }
     }
 
@@ -1884,6 +1989,10 @@
           currentStepIndex++;
           renderAllPlayers();
           playFootstep(currentStepIndex);
+
+          if (gameMode === 'online') {
+            syncOnlineRoom();
+          }
         } else {
           clearInterval(stepInterval);
           checkTileModifiers();
@@ -1907,6 +2016,7 @@
         setTimeout(() => {
           activePlayer.position = dest;
           renderAllPlayers();
+          if (gameMode === 'online') syncOnlineRoom();
           checkWinCondition();
         }, 500);
         return;
@@ -1925,11 +2035,13 @@
         setTimeout(() => {
           activePlayer.position = dest;
           renderAllPlayers();
+          if (gameMode === 'online') syncOnlineRoom();
           checkWinCondition();
         }, 650);
         return;
       }
 
+      if (gameMode === 'online') syncOnlineRoom();
       checkWinCondition();
     }
 
