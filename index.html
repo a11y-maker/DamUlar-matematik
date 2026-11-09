@@ -437,7 +437,11 @@
               conn.send({ type: 'ROOM_STATE', payload: window.getRoomState() });
             });
             conn.on('data', (msg) => {
-              if (msg && msg.type === 'ACTION') {
+              if (msg && msg.type === 'PLAYER_JOIN') {
+                if (window.handlePlayerJoinRequest) {
+                  window.handlePlayerJoinRequest(msg.player, conn);
+                }
+              } else if (msg && msg.type === 'ACTION') {
                 onClientUpdate(msg.payload);
                 // Broadcast ke semua client lain
                 window.OnlineMultiplayer.broadcast(msg.payload);
@@ -1072,80 +1076,118 @@
           handleOnlineRoomUpdate(data);
         });
 
-        // Tetapkan pemain 2 atau seterusnya
-        let existingPlayers = [...players];
-        let pIndex = existingPlayers.findIndex(p => p.email === email);
+        // Set bilik sementara dengan pemain sendiri dahulu, tunggu senarai rasmi dari Host
+        const tempPlayer = {
+          name: name,
+          email: email
+        };
 
-        if (pIndex === -1) {
-          pIndex = existingPlayers.length;
-          if (pIndex >= 4) {
-            showOnlineStatus("❌ Bilik ini telah penuh (maksimum 4 pemain).");
-            return;
-          }
-          const config = PLAYER_CONFIGS[pIndex];
-          existingPlayers.push({
-            ...config,
-            name: name,
-            email: email,
-            position: 1,
-            score: 100,
-            totalQuestions: 0,
-            correctQuestions: 0
+        if (hostConnection && hostConnection.open) {
+          hostConnection.send({ type: 'PLAYER_JOIN', player: tempPlayer });
+        }
+
+        // Hantar juga melalui Cross-Tab sekiranya diuji pada peranti yang sama
+        if (crossTabChannel) {
+          crossTabChannel.postMessage({
+            roomId: code,
+            type: 'PLAYER_JOIN',
+            player: tempPlayer
           });
         }
 
-        enterOnlineRoom(code, existingPlayers, pIndex);
-
-        // Maklumkan Host mengenai penyertaan pemain
-        syncOnlineRoom({
-          players: existingPlayers,
-          totalPlayers: existingPlayers.length
-        });
+        enterOnlineRoom(code, players, -1);
+        showOnlineStatus("✅ Berjaya bersambung ke bilik! Menyegerak senarai...", true);
 
       } catch (err) {
         showOnlineStatus(`Ralat: ${err.message || 'Gagal menyertai bilik'}`);
       }
     }
 
+    // Host menguruskan kemasukan pemain sebenar tanpa pemain hantu / dummy
+    window.handlePlayerJoinRequest = function(joiningPlayer, conn = null) {
+      if (!isRoomHost) return;
+
+      let pIndex = players.findIndex(p => p.email.toLowerCase() === joiningPlayer.email.toLowerCase());
+
+      if (pIndex === -1) {
+        if (players.length >= 4) {
+          if (conn && conn.open) {
+            conn.send({ type: 'ERROR', message: 'Bilik ini telah penuh!' });
+          }
+          return;
+        }
+
+        pIndex = players.length;
+        const config = PLAYER_CONFIGS[pIndex];
+        const newP = {
+          ...config,
+          name: joiningPlayer.name,
+          email: joiningPlayer.email,
+          position: 1,
+          score: 100,
+          totalQuestions: 0,
+          correctQuestions: 0
+        };
+        players.push(newP);
+        totalPlayers = players.length;
+
+        addLog(`👋 <b>${newP.name}</b> telah menyertai bilik sebagai <b>P${pIndex + 1}</b>!`, newP.textClass);
+        playSuccessChime();
+      }
+
+      renderScoreboards();
+      renderAllPlayers();
+      updateTurnBanner();
+
+      // Hantar senarai pemain rasmi terkini ke semua peranti
+      syncOnlineRoom({
+        players: players,
+        totalPlayers: players.length
+      });
+    };
+
     function enterOnlineRoom(roomId, initialPlayers, playerIdx) {
       gameMode = 'online';
       currentRoomId = roomId;
       myPlayerIndex = playerIdx;
-      totalPlayers = initialPlayers.length;
-      players = initialPlayers;
+      
+      // Jika playerIdx sah, tetapkan pemain
+      if (playerIdx >= 0) {
+        totalPlayers = initialPlayers.length;
+        players = initialPlayers;
+      }
 
+      const myName = document.getElementById('onlinePlayerName').value.trim();
       document.getElementById('modeBadge').textContent = `ONLINE BILIK #${roomId}`;
       document.getElementById('modeBadge').className = 'bg-indigo-600 text-white text-xs px-2.5 py-0.5 rounded-full font-sans font-bold shadow-sm';
-      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm bg-yellow-300 px-2 py-0.5 rounded-md border border-yellow-500">${roomId}</b> | Anda: <b>${players[myPlayerIndex].name} (P${myPlayerIndex + 1})</b>`;
+      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm bg-yellow-300 px-2 py-0.5 rounded-md border border-yellow-500">${roomId}</b> | Anda: <b>${myName}</b>`;
       document.getElementById('playerCountContainer').classList.add('hidden');
 
       closeLobbyModal();
       renderScoreboards();
       updateTurnBanner();
       renderAllPlayers();
-      addLog(`🌐 Anda telah menyertai bilik dalam talian <b>#${roomId}</b> sebagai <b>${players[myPlayerIndex].name}</b>!`, 'text-cyan-300');
-      playSuccessChime();
     }
 
     window.handleOnlineRoomUpdate = function(data) {
       if (!data) return;
 
+      // Jika mesej kemasukan pemain diterima melalui tab tempatan
+      if (data.type === 'PLAYER_JOIN' && isRoomHost) {
+        window.handlePlayerJoinRequest(data.player);
+        return;
+      }
+
       if (data.players && Array.isArray(data.players)) {
         players = data.players;
         totalPlayers = data.players.length;
-      }
 
-      if (typeof data.currentPlayerIndex === 'number') {
-        currentPlayerIndex = data.currentPlayerIndex;
-      }
-
-      if (data.dice1 && data.dice2) {
-        renderDiceFace('dice1', data.dice1);
-        renderDiceFace('dice2', data.dice2);
-        if (data.pendingSteps) {
-          pendingSteps = data.pendingSteps;
-          document.getElementById('diceSumText').innerHTML = 
-            `Jumlah Langkah: <span class="text-blue-600 font-black text-xl">${data.dice1} + ${data.dice2} = ${data.pendingSteps}</span>`;
+        // Kemas kini indeks pemain saya berdasarkan e-mel yang didaftarkan
+        const myEmail = document.getElementById('onlinePlayerEmail').value.trim().toLowerCase();
+        const foundIdx = players.findIndex(p => p.email && p.email.toLowerCase() === myEmail);
+        if (foundIdx !== -1) {
+          myPlayerIndex = foundIdx;
+          document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm bg-yellow-300 px-2 py-0.5 rounded-md border border-yellow-500">${currentRoomId}</b> | Anda: <b>${players[myPlayerIndex].name} (P${myPlayerIndex + 1})</b>`;
         }
       }
 
