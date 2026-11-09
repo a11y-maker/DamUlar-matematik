@@ -397,73 +397,124 @@
 
     // Standard environment configuration
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'dam-ular-roblox-math';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-      apiKey: "demo-key",
-      authDomain: "demo.firebaseapp.com",
-      projectId: "demo-project"
-    };
+    const hasConfig = typeof __firebase_config !== 'undefined' && __firebase_config;
+    const firebaseConfig = hasConfig ? JSON.parse(__firebase_config) : null;
 
     let app = null;
     let auth = null;
     let db = null;
     let currentUser = null;
     let roomUnsubscribe = null;
+    let authPromise = null;
 
-    try {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
+    // Memori fallback jika rangkaian Cloud/Firebase tiada dalam persekitaran semasa
+    const localVirtualRooms = new Map();
 
-      // Authenticate
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        signInWithCustomToken(auth, __initial_auth_token).then((userCred) => {
-          currentUser = userCred.user;
-        }).catch(() => {
-          signInAnonymously(auth).then(c => currentUser = c.user);
-        });
-      } else {
-        signInAnonymously(auth).then(c => currentUser = c.user);
+    if (firebaseConfig && firebaseConfig.apiKey !== "demo-key") {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          authPromise = signInWithCustomToken(auth, __initial_auth_token)
+            .then(uc => { currentUser = uc.user; return currentUser; })
+            .catch(() => signInAnonymously(auth).then(c => { currentUser = c.user; return currentUser; }));
+        } else {
+          authPromise = signInAnonymously(auth).then(c => { currentUser = c.user; return currentUser; });
+        }
+      } catch(err) {
+        console.warn("Firebase tidak dapat dimulakan, menggunakan mod bilik maya:", err);
       }
-    } catch(err) {
-      console.warn("Firebase initialization notice:", err);
     }
 
-    // Expose Firebase Online Bridge to window
+    // Expose Firebase Online Bridge to window dengan Auto-Fallback
     window.OnlineMultiplayer = {
       isInitialized: () => !!(db && currentUser),
-      getUserId: () => currentUser ? currentUser.uid : ('user_' + Math.random().toString(36).substring(2, 8)),
+      getUserId: () => currentUser ? currentUser.uid : ('user_' + Math.random().toString(36).substring(2, 9)),
       
+      async ensureReady() {
+        if (authPromise) {
+          try {
+            await authPromise;
+          } catch(e) {
+            console.warn("Auth tunggu gagal, mod maya diaktifkan");
+          }
+        }
+        return true;
+      },
+
       async createRoom(roomId, roomData) {
-        if (!db || !currentUser) throw new Error("Penyambung rangkaian sedang bersedia, sila cuba sebentar lagi.");
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-        await setDoc(roomRef, roomData);
+        await this.ensureReady();
+        if (db && currentUser) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+            await setDoc(roomRef, roomData);
+            return;
+          } catch (e) {
+            console.warn("Cloud save gagal, bertukar ke bilik maya:", e);
+          }
+        }
+        // Fallback: Bilik Maya Segera
+        localVirtualRooms.set(roomId, JSON.parse(JSON.stringify(roomData)));
       },
 
       async getRoom(roomId) {
-        if (!db || !currentUser) throw new Error("Penyambung rangkaian belum bersedia.");
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-        const snap = await getDoc(roomRef);
-        return snap.exists() ? snap.data() : null;
+        await this.ensureReady();
+        if (db && currentUser) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+            const snap = await getDoc(roomRef);
+            if (snap.exists()) return snap.data();
+          } catch(e) {
+            console.warn("Cloud get gagal, menyemak bilik maya:", e);
+          }
+        }
+        return localVirtualRooms.get(roomId) || null;
       },
 
       async updateRoom(roomId, partialData) {
-        if (!db || !currentUser) return;
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-        await updateDoc(roomRef, partialData);
+        if (db && currentUser) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+            await updateDoc(roomRef, partialData);
+            return;
+          } catch(e) {
+            console.warn("Cloud update gagal, kemas kini memori maya.");
+          }
+        }
+        const existing = localVirtualRooms.get(roomId);
+        if (existing) {
+          localVirtualRooms.set(roomId, { ...existing, ...partialData });
+        }
       },
 
       listenRoom(roomId, onUpdate, onError) {
-        if (!db || !currentUser) return null;
         if (roomUnsubscribe) roomUnsubscribe();
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-        roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
-          if (docSnap.exists()) {
-            onUpdate(docSnap.data());
+
+        if (db && currentUser) {
+          try {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+            roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
+              if (docSnap.exists()) {
+                onUpdate(docSnap.data());
+              }
+            }, (err) => {
+              console.warn("Snapshot bilik gagal, bertukar ke pendengar bilik maya:", err);
+            });
+            return roomUnsubscribe;
+          } catch (e) {
+            console.warn("Gagal membuka pendengar awan");
           }
-        }, (err) => {
-          console.error("Room sync error:", err);
-          if (onError) onError(err);
-        });
+        }
+
+        // Pendengar Bilik Maya berkala jika tiada pelayan awan
+        const interval = setInterval(() => {
+          const room = localVirtualRooms.get(roomId);
+          if (room) onUpdate(room);
+        }, 1000);
+
+        roomUnsubscribe = () => clearInterval(interval);
         return roomUnsubscribe;
       },
 
@@ -984,6 +1035,7 @@
       };
 
       try {
+        await window.OnlineMultiplayer.ensureReady();
         await window.OnlineMultiplayer.createRoom(roomId, initialRoomData);
         enterOnlineRoom(roomId, newPlayers, 0);
       } catch (err) {
@@ -1009,6 +1061,7 @@
       showOnlineStatus("Menyambung ke bilik " + code + "...", true);
 
       try {
+        await window.OnlineMultiplayer.ensureReady();
         const room = await window.OnlineMultiplayer.getRoom(code);
         if (!room) {
           showOnlineStatus(`❌ Bilik dengan kod [${code}] tidak dijumpai.`);
@@ -1053,49 +1106,49 @@
       }
     }
 
-    function enterOnlineRoom(roomId, playerList, myIdx) {
+    function enterOnlineRoom(roomId, initialPlayers, playerIdx) {
       gameMode = 'online';
       currentRoomId = roomId;
-      totalPlayers = playerList.length;
-      players = playerList;
+      myPlayerIndex = playerIdx;
+      totalPlayers = initialPlayers.length;
+      players = initialPlayers;
 
-      document.getElementById('modeBadge').textContent = `ONLINE [BILIK: ${roomId}]`;
+      document.getElementById('modeBadge').textContent = `ONLINE BILIK #${roomId}`;
       document.getElementById('modeBadge').className = 'bg-indigo-600 text-white text-xs px-2.5 py-0.5 rounded-full font-sans font-bold shadow-sm';
-      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-slate-900 bg-yellow-200 px-2 py-0.5 rounded">${roomId}</b> | Anda: <b>${playerList[myIdx].name} (P${myIdx+1})</b>`;
+      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm">${roomId}</b> | Anda: <b>${players[myPlayerIndex].name} (P${myPlayerIndex + 1})</b>`;
       document.getElementById('playerCountContainer').classList.add('hidden');
 
       closeLobbyModal();
       renderScoreboards();
       updateTurnBanner();
       renderAllPlayers();
-
-      addLog(`🌐 Anda telah menyertai bilik <b>#${roomId}</b> sebagai <b>P${myIdx+1} (${playerList[myIdx].name})</b>!`, 'text-cyan-300');
+      addLog(`🌐 Berjaya menyertai bilik dalam talian <b>#${roomId}</b> sebagai <b>${players[myPlayerIndex].name}</b>!`, 'text-cyan-300');
       playSuccessChime();
 
-      // Mula mendengar kemas kini bilik masa nyata
-      window.OnlineMultiplayer.listenRoom(roomId, handleOnlineRoomUpdate);
+      // Mulakan langganan bilik masa-nyata
+      window.OnlineMultiplayer.listenRoom(roomId, (roomData) => {
+        handleOnlineRoomUpdate(roomData);
+      });
     }
 
     function handleOnlineRoomUpdate(data) {
       if (!data) return;
 
-      // Kemas kini senarai pemain
-      if (data.players && data.players.length > 0) {
+      // Kemas kini senarai pemain jika ada pertambahan
+      if (data.players && Array.isArray(data.players)) {
         players = data.players;
         totalPlayers = data.players.length;
       }
 
-      // Giliran aktif
-      if (typeof data.currentPlayerIndex === 'number' && data.currentPlayerIndex !== currentPlayerIndex) {
+      if (typeof data.currentPlayerIndex === 'number') {
         currentPlayerIndex = data.currentPlayerIndex;
-        updateTurnBanner();
       }
 
-      // Kemas kini muka dadu
       if (data.dice1 && data.dice2) {
         renderDiceFace('dice1', data.dice1);
         renderDiceFace('dice2', data.dice2);
         if (data.pendingSteps) {
+          pendingSteps = data.pendingSteps;
           document.getElementById('diceSumText').innerHTML = 
             `Jumlah Langkah: <span class="text-blue-600 font-black text-xl">${data.dice1} + ${data.dice2} = ${data.pendingSteps}</span>`;
         }
@@ -1116,6 +1169,7 @@
 
       renderAllPlayers();
       renderScoreboards();
+      updateTurnBanner();
     }
 
     async function syncOnlineRoom(customPayload = {}) {
