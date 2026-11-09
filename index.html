@@ -1199,6 +1199,14 @@
         return;
       }
 
+      // Animasi pergerakan langkah dari Host ke Client
+      if (data.actionType === 'PLAYER_MOVED') {
+        if (players[data.playerIndex]) {
+          animatePlayerSteps(data.playerIndex, data.fromPos, data.toPos);
+        }
+        return;
+      }
+
       if (data.players && Array.isArray(data.players)) {
         players = data.players;
         totalPlayers = data.players.length;
@@ -1977,27 +1985,46 @@
       }
     }
 
-    function advancePlayer(steps) {
-      let stepsRemaining = steps;
-      const activePlayer = players[currentPlayerIndex];
-      let currentStepIndex = 0;
-
+    function animatePlayerSteps(playerIdx, fromPos, toPos, onComplete = null) {
+      const p = players[playerIdx];
+      if (!p) return;
+      
+      let cur = fromPos;
+      let stepCount = 0;
       const stepInterval = setInterval(() => {
-        if (stepsRemaining > 0 && activePlayer.position < BOARD_SIZE) {
-          activePlayer.position++;
-          stepsRemaining--;
-          currentStepIndex++;
+        if (cur < toPos && cur < BOARD_SIZE) {
+          cur++;
+          p.position = cur;
+          stepCount++;
           renderAllPlayers();
-          playFootstep(currentStepIndex);
-
-          if (gameMode === 'online') {
-            syncOnlineRoom();
-          }
+          playFootstep(stepCount);
         } else {
           clearInterval(stepInterval);
-          checkTileModifiers();
+          p.position = Math.min(toPos, BOARD_SIZE);
+          renderAllPlayers();
+          if (onComplete) onComplete();
         }
-      }, 220);
+      }, 200);
+    }
+
+    function advancePlayer(steps) {
+      const activePlayer = players[currentPlayerIndex];
+      const startPos = activePlayer.position;
+      const targetPos = Math.min(BOARD_SIZE, startPos + steps);
+
+      // Siarkan tindakan mula gerak kepada semua peranti agar animasi berjalan serentak
+      if (gameMode === 'online') {
+        window.OnlineMultiplayer.broadcast({
+          actionType: 'PLAYER_MOVED',
+          playerIndex: currentPlayerIndex,
+          fromPos: startPos,
+          toPos: targetPos
+        });
+      }
+
+      animatePlayerSteps(currentPlayerIndex, startPos, targetPos, () => {
+        checkTileModifiers();
+      });
     }
 
     function checkTileModifiers() {
