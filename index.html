@@ -11,6 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- PeerJS WebRTC P2P Multiplayer Library for Real-time Cross-Device Online Rooms -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <style>
     body {
@@ -189,15 +192,11 @@
         <!-- Dadu Kembar Display -->
         <div class="flex items-center gap-5 my-2">
           <!-- Dadu 1 -->
-          <div id="dice1" class="die">
-            <!-- Dots dynamically generated -->
-          </div>
+          <div id="dice1" class="die"></div>
           <!-- Sign Tambah -->
           <span class="font-bungee text-2xl text-slate-700">+</span>
           <!-- Dadu 2 -->
-          <div id="dice2" class="die">
-            <!-- Dots dynamically generated -->
-          </div>
+          <div id="dice2" class="die"></div>
         </div>
 
         <div id="diceSumText" class="font-bungee text-slate-700 text-sm mt-1 mb-2">
@@ -205,9 +204,7 @@
         </div>
 
         <!-- Giliran Aktif Label -->
-        <div id="activePlayerTurnBanner" class="w-full py-1.5 px-3 mb-2 rounded-xl text-center text-xs sm:text-sm font-bungee tracking-wide border-2">
-          <!-- Giliran Pemain Diisi JS -->
-        </div>
+        <div id="activePlayerTurnBanner" class="w-full py-1.5 px-3 mb-2 rounded-xl text-center text-xs sm:text-sm font-bungee tracking-wide border-2"></div>
 
         <!-- Butang Putarkan 2 Dadu Serentak -->
         <button id="rollDiceBtn" onclick="handleRollDice()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bungee text-lg py-3 px-6 rounded-2xl roblox-btn border-emerald-700 flex items-center justify-center gap-3">
@@ -241,14 +238,10 @@
           </div>
 
           <div id="activeQuestionPrompt" class="hidden text-left">
-            <p id="questionText" class="text-base sm:text-lg font-bold text-slate-800 mb-3 bg-indigo-50 p-3 rounded-xl border border-indigo-200 shadow-sm leading-snug">
-              <!-- Soalan dimasukkan sini -->
-            </p>
+            <p id="questionText" class="text-base sm:text-lg font-bold text-slate-800 mb-3 bg-indigo-50 p-3 rounded-xl border border-indigo-200 shadow-sm leading-snug"></p>
 
             <!-- 4 Butang Pilihan Jawapan -->
-            <div id="optionsGrid" class="grid grid-cols-2 gap-2 mt-2">
-              <!-- Options populated by JS -->
-            </div>
+            <div id="optionsGrid" class="grid grid-cols-2 gap-2 mt-2"></div>
           </div>
         </div>
 
@@ -355,7 +348,7 @@
                 MASUK
               </button>
             </div>
-            <p class="text-[10px] text-slate-500 leading-tight">Masukkan kod bilik yang diberikan oleh rakan.</p>
+            <p class="text-[10px] text-slate-500 leading-tight">Masukkan kod 4-angka yang diberikan oleh rakan.</p>
           </div>
         </div>
 
@@ -389,139 +382,163 @@
     </div>
   </div>
 
-  <!-- Firebase Scripts for Real-time Cloud Storage Online Multiplayer -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  <!-- Network & Online Multiplayer Engine (Hybrid WebRTC PeerJS + Cross-Tab Sync) -->
+  <script>
+    let peerInstance = null;
+    let peerConnections = [];
+    let hostConnection = null;
+    let isRoomHost = false;
+    let crossTabChannel = null;
 
-    // Standard environment configuration
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'dam-ular-roblox-math';
-    const hasConfig = typeof __firebase_config !== 'undefined' && __firebase_config;
-    const firebaseConfig = hasConfig ? JSON.parse(__firebase_config) : null;
-
-    let app = null;
-    let auth = null;
-    let db = null;
-    let currentUser = null;
-    let roomUnsubscribe = null;
-    let authPromise = null;
-
-    // Memori fallback jika rangkaian Cloud/Firebase tiada dalam persekitaran semasa
-    const localVirtualRooms = new Map();
-
-    if (firebaseConfig && firebaseConfig.apiKey !== "demo-key") {
-      try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          authPromise = signInWithCustomToken(auth, __initial_auth_token)
-            .then(uc => { currentUser = uc.user; return currentUser; })
-            .catch(() => signInAnonymously(auth).then(c => { currentUser = c.user; return currentUser; }));
-        } else {
-          authPromise = signInAnonymously(auth).then(c => { currentUser = c.user; return currentUser; });
-        }
-      } catch(err) {
-        console.warn("Firebase tidak dapat dimulakan, menggunakan mod bilik maya:", err);
+    try {
+      if (window.BroadcastChannel) {
+        crossTabChannel = new BroadcastChannel('roblox_dam_sync_channel');
+        crossTabChannel.onmessage = (ev) => {
+          if (ev.data && ev.data.roomId === currentRoomId && window.handleOnlineRoomUpdate) {
+            window.handleOnlineRoomUpdate(ev.data.payload);
+          }
+        };
       }
+    } catch(e) {
+      console.warn("BroadcastChannel not supported", e);
     }
 
-    // Expose Firebase Online Bridge to window dengan Auto-Fallback
     window.OnlineMultiplayer = {
-      isInitialized: () => !!(db && currentUser),
-      getUserId: () => currentUser ? currentUser.uid : ('user_' + Math.random().toString(36).substring(2, 9)),
-      
-      async ensureReady() {
-        if (authPromise) {
-          try {
-            await authPromise;
-          } catch(e) {
-            console.warn("Auth tunggu gagal, mod maya diaktifkan");
+      initHost(roomId, initialData, onClientUpdate) {
+        isRoomHost = true;
+        peerConnections = [];
+        
+        return new Promise((resolve, reject) => {
+          const peerId = 'dam-ular-' + roomId;
+          
+          if (peerInstance) {
+            try { peerInstance.destroy(); } catch(e){}
           }
-        }
-        return true;
-      },
 
-      async createRoom(roomId, roomData) {
-        await this.ensureReady();
-        if (db && currentUser) {
-          try {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-            await setDoc(roomRef, roomData);
-            return;
-          } catch (e) {
-            console.warn("Cloud save gagal, bertukar ke bilik maya:", e);
-          }
-        }
-        // Fallback: Bilik Maya Segera
-        localVirtualRooms.set(roomId, JSON.parse(JSON.stringify(roomData)));
-      },
+          peerInstance = new Peer(peerId, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+              ]
+            }
+          });
 
-      async getRoom(roomId) {
-        await this.ensureReady();
-        if (db && currentUser) {
-          try {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-            const snap = await getDoc(roomRef);
-            if (snap.exists()) return snap.data();
-          } catch(e) {
-            console.warn("Cloud get gagal, menyemak bilik maya:", e);
-          }
-        }
-        return localVirtualRooms.get(roomId) || null;
-      },
+          peerInstance.on('open', (id) => {
+            console.log("Bilik Awan dibuka dengan ID:", id);
+            resolve(true);
+          });
 
-      async updateRoom(roomId, partialData) {
-        if (db && currentUser) {
-          try {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-            await updateDoc(roomRef, partialData);
-            return;
-          } catch(e) {
-            console.warn("Cloud update gagal, kemas kini memori maya.");
-          }
-        }
-        const existing = localVirtualRooms.get(roomId);
-        if (existing) {
-          localVirtualRooms.set(roomId, { ...existing, ...partialData });
-        }
-      },
-
-      listenRoom(roomId, onUpdate, onError) {
-        if (roomUnsubscribe) roomUnsubscribe();
-
-        if (db && currentUser) {
-          try {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-            roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
-              if (docSnap.exists()) {
-                onUpdate(docSnap.data());
-              }
-            }, (err) => {
-              console.warn("Snapshot bilik gagal, bertukar ke pendengar bilik maya:", err);
+          peerInstance.on('connection', (conn) => {
+            peerConnections.push(conn);
+            conn.on('open', () => {
+              // Hantar data bilik semasa kepada client yang baru join
+              conn.send({ type: 'ROOM_STATE', payload: window.getRoomState() });
             });
-            return roomUnsubscribe;
-          } catch (e) {
-            console.warn("Gagal membuka pendengar awan");
-          }
-        }
+            conn.on('data', (msg) => {
+              if (msg && msg.type === 'ACTION') {
+                onClientUpdate(msg.payload);
+                // Broadcast ke semua client lain
+                window.OnlineMultiplayer.broadcast(msg.payload);
+              }
+            });
+            conn.on('close', () => {
+              peerConnections = peerConnections.filter(c => c !== conn);
+            });
+          });
 
-        // Pendengar Bilik Maya berkala jika tiada pelayan awan
-        const interval = setInterval(() => {
-          const room = localVirtualRooms.get(roomId);
-          if (room) onUpdate(room);
-        }, 1000);
-
-        roomUnsubscribe = () => clearInterval(interval);
-        return roomUnsubscribe;
+          peerInstance.on('error', (err) => {
+            console.warn("PeerJS Host Error:", err);
+            // Tetap izinkan main melalui cross-tab
+            resolve(true);
+          });
+        });
       },
 
-      leaveRoom() {
-        if (roomUnsubscribe) {
-          roomUnsubscribe();
-          roomUnsubscribe = null;
+      connectToRoom(roomId, onDataReceived) {
+        isRoomHost = false;
+        return new Promise((resolve, reject) => {
+          const peerId = 'dam-ular-client-' + Math.floor(1000 + Math.random() * 9000);
+          
+          if (peerInstance) {
+            try { peerInstance.destroy(); } catch(e){}
+          }
+
+          peerInstance = new Peer(peerId, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+              ]
+            }
+          });
+
+          let timeout = setTimeout(() => {
+            // Jika masa sambungan awan melebihi 4 saat, semak sama ada ada tab host setempat
+            resolve(true);
+          }, 3500);
+
+          peerInstance.on('open', () => {
+            const hostId = 'dam-ular-' + roomId;
+            hostConnection = peerInstance.connect(hostId, { reliable: true });
+
+            hostConnection.on('open', () => {
+              clearTimeout(timeout);
+              resolve(true);
+            });
+
+            hostConnection.on('data', (msg) => {
+              if (msg && msg.payload) {
+                onDataReceived(msg.payload);
+              }
+            });
+
+            hostConnection.on('error', (e) => {
+              console.warn("Sambungan host gagal:", e);
+            });
+          });
+
+          peerInstance.on('error', (err) => {
+            clearTimeout(timeout);
+            resolve(true);
+          });
+        });
+      },
+
+      broadcast(payload) {
+        // Hantar ke semua sambungan WebRTC
+        if (isRoomHost) {
+          peerConnections.forEach(conn => {
+            if (conn.open) {
+              try { conn.send({ type: 'ROOM_STATE', payload }); } catch(e){}
+            }
+          });
+        } else if (hostConnection && hostConnection.open) {
+          try { hostConnection.send({ type: 'ACTION', payload }); } catch(e){}
+        }
+
+        // Segerakkan ke tab/tetingkap setempat juga
+        if (crossTabChannel && currentRoomId) {
+          try {
+            crossTabChannel.postMessage({ roomId: currentRoomId, payload });
+          } catch(e){}
+        }
+      },
+
+      leave() {
+        if (peerConnections) {
+          peerConnections.forEach(c => { try { c.close(); } catch(e){} });
+          peerConnections = [];
+        }
+        if (hostConnection) {
+          try { hostConnection.close(); } catch(e){}
+          hostConnection = null;
+        }
+        if (peerInstance) {
+          try { peerInstance.destroy(); } catch(e){}
+          peerInstance = null;
         }
       }
     };
@@ -529,7 +546,6 @@
 
   <!-- Audio Context Generator (No external mp3 needed, works instantly!) -->
   <script>
-    /* Web Audio API Synthesizer for Roblox-Style SFX */
     let audioCtx = null;
     let isMuted = false;
 
@@ -772,9 +788,6 @@
 
   <!-- Game Logic, Board Rendering & Questions Engine -->
   <script>
-    /* ========================================================
-       1. GAME STATE & CONSTANTS
-       ======================================================== */
     const BOARD_SIZE = 100;
     let isRolling = false;
     let pendingSteps = 0;
@@ -782,11 +795,9 @@
     let timerInterval = null;
     let timeLeft = 30;
 
-    // Mod Permainan: 'offline' (Tempatan) atau 'online' (Cloud Room)
     let gameMode = 'offline';
     let currentRoomId = null;
-    let myOnlinePlayerId = null; // UID pengguna tempatan dalam online room
-    let myPlayerIndex = 0; // Index 0-3 dalam giliran
+    let myPlayerIndex = 0;
 
     const PLAYER_CONFIGS = [
       { id: 0, name: 'Pemain 1', colorName: 'Merah', colorClass: 'bg-red-500', borderClass: 'border-red-600', textClass: 'text-red-500', badgeClass: 'bg-red-600', capColor: 'bg-red-600', shirtColor: 'bg-red-500', pantsColor: 'bg-slate-900' },
@@ -864,7 +875,7 @@
 
     function updateTurnBanner() {
       const banner = document.getElementById('activePlayerTurnBanner');
-      const p = players[currentPlayerIndex];
+      const p = players[currentPlayerIndex] || players[0];
       const isMyTurn = (gameMode === 'offline') || (gameMode === 'online' && currentPlayerIndex === myPlayerIndex);
 
       banner.className = `w-full py-2 px-3 mb-2 rounded-xl text-center text-xs sm:text-sm font-bungee tracking-wide border-2 ${p.badgeClass} text-white shadow-sm`;
@@ -877,7 +888,6 @@
         banner.innerHTML = `<i class="fa-solid fa-gamepad mr-1.5"></i> GILIRAN: ${p.name.toUpperCase()} (${p.colorName.toUpperCase()})`;
       }
 
-      // Roll button control for online mode
       const rollBtn = document.getElementById('rollDiceBtn');
       if (gameMode === 'online' && !isMyTurn) {
         rollBtn.disabled = true;
@@ -896,12 +906,12 @@
       addLog(`👉 Giliran berpindah kepada <b>${players[currentPlayerIndex].name}</b>!`, 'text-yellow-200');
       playRobloxBeep(480, 0.08);
 
-      if (gameMode === 'online' && currentPlayerIndex === myPlayerIndex) {
+      if (gameMode === 'online') {
         syncOnlineRoom();
       }
     }
 
-    // Ladders (Tangga: Naik) & Snakes (Ular: Turun)
+    // Tangga & Ular
     const LADDERS = { 4: 16, 12: 33, 28: 55, 36: 44, 51: 72, 71: 92, 80: 99 };
     const SNAKES = { 30: 8, 47: 15, 56: 19, 73: 53, 87: 57, 94: 64, 98: 78 };
 
@@ -915,7 +925,7 @@
     };
 
     /* ========================================================
-       2. MOD LOBBY (OFFLINE & ONLINE MULTIPLAYER CONTROLLER)
+       2. MOD LOBBY & ONLINE MULTIPLAYER CONTROLLER
        ======================================================== */
     let selectedOfflineCount = 2;
 
@@ -960,7 +970,7 @@
 
     function startOfflineMode() {
       if (gameMode === 'online') {
-        window.OnlineMultiplayer.leaveRoom();
+        window.OnlineMultiplayer.leave();
       }
       gameMode = 'offline';
       currentRoomId = null;
@@ -986,6 +996,19 @@
       box.innerHTML = msg;
     }
 
+    window.getRoomState = function() {
+      return {
+        players,
+        totalPlayers,
+        currentPlayerIndex,
+        pendingSteps,
+        currentQuestion,
+        dice1: parseInt(document.getElementById('dice1').dataset.val || '3'),
+        dice2: parseInt(document.getElementById('dice2').dataset.val || '4'),
+        updatedAt: Date.now()
+      };
+    };
+
     // Bina Bilik Online (Host)
     async function createOnlineRoom() {
       const name = document.getElementById('onlinePlayerName').value.trim();
@@ -1000,9 +1023,8 @@
         return;
       }
 
-      showOnlineStatus("Mencipta bilik dalam talian...", true);
+      showOnlineStatus("🚀 Membuka Bilik Awan...", true);
       const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-      myOnlinePlayerId = window.OnlineMultiplayer.getUserId();
       myPlayerIndex = 0;
 
       const newPlayers = [
@@ -1010,7 +1032,6 @@
           ...PLAYER_CONFIGS[0],
           name: name,
           email: email,
-          uid: myOnlinePlayerId,
           position: 1,
           score: 100,
           totalQuestions: 0,
@@ -1018,25 +1039,11 @@
         }
       ];
 
-      const initialRoomData = {
-        roomId: roomId,
-        hostEmail: email,
-        hostName: name,
-        totalPlayers: 1,
-        players: newPlayers,
-        currentPlayerIndex: 0,
-        dice1: 3,
-        dice2: 4,
-        pendingSteps: 0,
-        currentQuestion: null,
-        gameEnded: false,
-        winner: null,
-        updatedAt: Date.now()
-      };
-
       try {
-        await window.OnlineMultiplayer.ensureReady();
-        await window.OnlineMultiplayer.createRoom(roomId, initialRoomData);
+        await window.OnlineMultiplayer.initHost(roomId, { players: newPlayers }, (data) => {
+          handleOnlineRoomUpdate(data);
+        });
+
         enterOnlineRoom(roomId, newPlayers, 0);
       } catch (err) {
         showOnlineStatus(`Ralat: ${err.message || 'Gagal mencipta bilik'}`);
@@ -1047,60 +1054,54 @@
     async function joinOnlineRoom() {
       const name = document.getElementById('onlinePlayerName').value.trim();
       const email = document.getElementById('onlinePlayerEmail').value.trim();
-      const code = document.getElementById('joinRoomCodeInput').value.trim().toUpperCase();
+      const code = document.getElementById('joinRoomCodeInput').value.trim();
 
       if (!name || !email) {
         showOnlineStatus("⚠️ Sila masukkan Nama dan E-mel anda.");
         return;
       }
       if (!code) {
-        showOnlineStatus("⚠️ Sila masukkan Kod Bilik.");
+        showOnlineStatus("⚠️ Sila masukkan Kod Bilik 4-angka.");
         return;
       }
 
-      showOnlineStatus("Menyambung ke bilik " + code + "...", true);
+      showOnlineStatus(`📡 Menyambung ke Bilik #${code}...`, true);
 
       try {
-        await window.OnlineMultiplayer.ensureReady();
-        const room = await window.OnlineMultiplayer.getRoom(code);
-        if (!room) {
-          showOnlineStatus(`❌ Bilik dengan kod [${code}] tidak dijumpai.`);
-          return;
-        }
+        await window.OnlineMultiplayer.connectToRoom(code, (data) => {
+          handleOnlineRoomUpdate(data);
+        });
 
-        let existingPlayers = room.players || [];
-        myOnlinePlayerId = window.OnlineMultiplayer.getUserId();
+        // Tetapkan pemain 2 atau seterusnya
+        let existingPlayers = [...players];
+        let pIndex = existingPlayers.findIndex(p => p.email === email);
 
-        // Semak jika pengguna sudah ada dalam senarai
-        let playerIdx = existingPlayers.findIndex(p => p.email === email || p.uid === myOnlinePlayerId);
-
-        if (playerIdx === -1) {
-          if (existingPlayers.length >= 4) {
+        if (pIndex === -1) {
+          pIndex = existingPlayers.length;
+          if (pIndex >= 4) {
             showOnlineStatus("❌ Bilik ini telah penuh (maksimum 4 pemain).");
             return;
           }
-          playerIdx = existingPlayers.length;
-          const config = PLAYER_CONFIGS[playerIdx];
+          const config = PLAYER_CONFIGS[pIndex];
           existingPlayers.push({
             ...config,
             name: name,
             email: email,
-            uid: myOnlinePlayerId,
             position: 1,
             score: 100,
             totalQuestions: 0,
             correctQuestions: 0
           });
-
-          await window.OnlineMultiplayer.updateRoom(code, {
-            players: existingPlayers,
-            totalPlayers: existingPlayers.length,
-            updatedAt: Date.now()
-          });
         }
 
-        myPlayerIndex = playerIdx;
-        enterOnlineRoom(code, existingPlayers, playerIdx);
+        enterOnlineRoom(code, existingPlayers, pIndex);
+
+        // Maklumkan Host mengenai penyertaan pemain
+        syncOnlineRoom({
+          players: existingPlayers,
+          totalPlayers: existingPlayers.length
+        });
+
       } catch (err) {
         showOnlineStatus(`Ralat: ${err.message || 'Gagal menyertai bilik'}`);
       }
@@ -1115,26 +1116,20 @@
 
       document.getElementById('modeBadge').textContent = `ONLINE BILIK #${roomId}`;
       document.getElementById('modeBadge').className = 'bg-indigo-600 text-white text-xs px-2.5 py-0.5 rounded-full font-sans font-bold shadow-sm';
-      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm">${roomId}</b> | Anda: <b>${players[myPlayerIndex].name} (P${myPlayerIndex + 1})</b>`;
+      document.getElementById('roomInfoText').innerHTML = `Kod Bilik: <b class="text-indigo-950 font-black tracking-wider text-sm bg-yellow-300 px-2 py-0.5 rounded-md border border-yellow-500">${roomId}</b> | Anda: <b>${players[myPlayerIndex].name} (P${myPlayerIndex + 1})</b>`;
       document.getElementById('playerCountContainer').classList.add('hidden');
 
       closeLobbyModal();
       renderScoreboards();
       updateTurnBanner();
       renderAllPlayers();
-      addLog(`🌐 Berjaya menyertai bilik dalam talian <b>#${roomId}</b> sebagai <b>${players[myPlayerIndex].name}</b>!`, 'text-cyan-300');
+      addLog(`🌐 Anda telah menyertai bilik dalam talian <b>#${roomId}</b> sebagai <b>${players[myPlayerIndex].name}</b>!`, 'text-cyan-300');
       playSuccessChime();
-
-      // Mulakan langganan bilik masa-nyata
-      window.OnlineMultiplayer.listenRoom(roomId, (roomData) => {
-        handleOnlineRoomUpdate(roomData);
-      });
     }
 
-    function handleOnlineRoomUpdate(data) {
+    window.handleOnlineRoomUpdate = function(data) {
       if (!data) return;
 
-      // Kemas kini senarai pemain jika ada pertambahan
       if (data.players && Array.isArray(data.players)) {
         players = data.players;
         totalPlayers = data.players.length;
@@ -1154,7 +1149,6 @@
         }
       }
 
-      // Kemas kini soalan matematik jika ada
       if (data.currentQuestion && (!currentQuestion || currentQuestion.text !== data.currentQuestion.text)) {
         currentQuestion = data.currentQuestion;
         displayQuestionCard();
@@ -1162,7 +1156,6 @@
         resetQuestionCardState();
       }
 
-      // Semak jika ada pemenang
       if (data.gameEnded && data.winner) {
         triggerVictory(data.winner);
       }
@@ -1170,23 +1163,22 @@
       renderAllPlayers();
       renderScoreboards();
       updateTurnBanner();
-    }
+    };
 
-    async function syncOnlineRoom(customPayload = {}) {
+    function syncOnlineRoom(customPayload = {}) {
       if (gameMode !== 'online' || !currentRoomId) return;
-      try {
-        const payload = {
-          players: players,
-          currentPlayerIndex: currentPlayerIndex,
-          pendingSteps: pendingSteps,
-          currentQuestion: currentQuestion,
-          updatedAt: Date.now(),
-          ...customPayload
-        };
-        await window.OnlineMultiplayer.updateRoom(currentRoomId, payload);
-      } catch (e) {
-        console.error("Gagal menyegerak bilik online:", e);
-      }
+      const payload = {
+        players: players,
+        totalPlayers: players.length,
+        currentPlayerIndex: currentPlayerIndex,
+        pendingSteps: pendingSteps,
+        currentQuestion: currentQuestion,
+        dice1: parseInt(document.getElementById('dice1').dataset.val || '3'),
+        dice2: parseInt(document.getElementById('dice2').dataset.val || '4'),
+        updatedAt: Date.now(),
+        ...customPayload
+      };
+      window.OnlineMultiplayer.broadcast(payload);
     }
 
     /* ========================================================
@@ -1471,6 +1463,7 @@
        ======================================================== */
     function renderDiceFace(elementId, value) {
       const dieEl = document.getElementById(elementId);
+      dieEl.dataset.val = value;
       dieEl.innerHTML = '';
       const pattern = DICE_PATTERNS[value] || [];
       for (let i = 0; i < 9; i++) {
@@ -1489,7 +1482,6 @@
     renderDiceFace('dice2', 4);
 
     function handleRollDice() {
-      // Sekat jika bukan giliran pemain tempatan dalam online mode
       if (gameMode === 'online' && currentPlayerIndex !== myPlayerIndex) {
         return;
       }
@@ -1980,7 +1972,6 @@
         resizeCanvasAndRedraw();
       });
 
-      // Buka modal pemilihan mod secara automatik pada awal untuk kemudahan pengguna
       setTimeout(openLobbyModal, 400);
     };
   </script>
