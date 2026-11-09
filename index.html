@@ -910,7 +910,7 @@
     }
 
     function nextTurn() {
-      // Jika dalam talian dan bukan host, jangan tukar giliran sendiri; tunggu data rasmi daripada Host
+      // Jika dalam talian dan bukan host, abaikan kerana Host akan selaraskan
       if (gameMode === 'online' && !isRoomHost) {
         return;
       }
@@ -1888,21 +1888,35 @@
       document.getElementById('timerBadge').classList.add('hidden');
       
       const activePlayer = players[currentPlayerIndex];
-      activePlayer.totalQuestions++;
-
       const allButtons = document.querySelectorAll('#optionsGrid button');
       allButtons.forEach(b => b.disabled = true);
 
       const isCorrect = (selectedAnswer === currentQuestion.correct);
 
-      // Jika Client dalam mod online, hantar jawapan ke Host
+      // Jika Client dalam mod online (bukan host), hantar jawapan ke Host dan TUNGGU arahan Host
       if (gameMode === 'online' && !isRoomHost) {
+        if (isCorrect) {
+          buttonElement.classList.remove('bg-slate-100', 'hover:bg-yellow-200');
+          buttonElement.classList.add('bg-emerald-500', 'text-white', 'border-emerald-700');
+          spawnRobloxPopup(`TEPAT!`, true, buttonElement);
+          playSuccessChime();
+        } else {
+          buttonElement.classList.remove('bg-slate-100');
+          buttonElement.classList.add('bg-red-500', 'text-white', 'border-red-800');
+          playRobloxOof();
+          spawnRobloxPopup(`OOF!`, false, buttonElement);
+        }
+
         window.OnlineMultiplayer.broadcast({
           actionType: 'ANSWER_CHOSEN',
           selectedAnswer: selectedAnswer,
           playerIndex: myPlayerIndex
         });
+        return; // Hentikan di sini untuk Client, jangan panggil advancePlayer sendiri!
       }
+
+      // Bahagian di bawah ini hanya dijalankan oleh Host atau dalam Mod Offline:
+      activePlayer.totalQuestions++;
 
       if (isCorrect) {
         activePlayer.correctQuestions++;
@@ -1952,6 +1966,11 @@
     }
 
     function handleTimeOut() {
+      if (gameMode === 'online' && !isRoomHost) {
+        // Biarkan Host yang menguruskan penalti masa tamat
+        return;
+      }
+
       const activePlayer = players[currentPlayerIndex];
       activePlayer.totalQuestions++;
       playRobloxOof();
