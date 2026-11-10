@@ -1,49 +1,4 @@
 
-Conversation with Gemini
-boleh kau buat player tu lawan dengan ai\
-
-Saya tidak boleh mengubah atau mengedit kod aplikasi/permainan ini secara terus dari gambar sahaja, tetapi jika ini adalah projek permainan yang sedang anda bina (contohnya menggunakan HTML/JavaScript, Roblox Lua, atau Unity), saya boleh bantu tuliskan kod untuk mod AI tersebut.
-
-Untuk menambah mod Lawan AI (vs AI), berikut adalah cara asas yang boleh dilaksanakan bergantung pada cara anda membangunkan permainan ini:
-
-1. Pilihan UI Mod Permainan
-Anda boleh menambah butang baharu pada menu utama:
-
-Terus Main (Offline)
-
-Lawan AI (vs Bot) (Butang Baru)
-
-Multiplayer Online
-
-2. Contoh Logik Kod AI (JavaScript)
-Jika ini permainan berasaskan web/UI, anda boleh buat fungsi pergerakan automatik untuk AI:
-
-JavaScript
-// Logik asas pergerakan AI (Bot)
-function giliranAI() {
-    console.log("AI sedang berfikir...");
-    
-    setTimeout(() => {
-        // Contoh: AI pilih langkah secara rawak atau ikut strategi
-        let langkahPilihan = pilihLangkahTerbaik(); 
-        
-        // Jalankan pergerakan AI
-        lakukanPergerakan(langkahPilihan);
-        
-        // Tukar giliran semula kepada Pemain
-        giliranPemain = true;
-    }, 1000); // AI tunggu 1 saat sebelum bergerak
-}
-
-function pilihLangkahTerbaik() {
-    // Tambah logik keputusan AI di sini (Rawak / Minimax / Peraturan Asas)
-    return Math.floor(Math.random() * pilihanWujud.length);
-}
-Jika anda mahu saya bantu tuliskan kod penuh mengikut perisian yang anda guna, boleh kongsikan:
-
-Bahasa pengaturcaraan / Engine yang anda gunakan (contoh: Roblox Luau, HTML/JS, Unity C#).
-
-Jenis permainan ini (contoh: Papan Tic-Tac-Toe, Padanan Warna, Kuiz, atau Kad).
 
 <!DOCTYPE html>
 
@@ -2466,21 +2421,6 @@ HTML
   </script>
 </body>
 </html>
-Penambahbaikan Utama Yang Dibuat:
-Mod AI Bot Tambahan:
-
-Menambah mod pilihan "vsAI" pada menu drop-down & modal pilihan mod.
-
-AI Automatik: Apabila giliran AI tiba, AI akan memutar dadu sendiri, membuat pertimbangan berfikir selama 1.5 detik, dan menjawab soalan secara automatik (mempunyai tahap ketepatan jawapan 80%).
-
-Logik Kod Berfungsi Penuh:
-
-Menghubungkan fungsi audio synthesizer WebAudio, pergerakan petak bertapak demi bertapak, pengiraan tangga/ular, dan penjanaan soalan matematik secara automatik.
-
-Penyelamatan Kod Terputus:
-
-Melengkapkan tag <script> & </body></html> yang terputus di bahagian bawah kod asal anda.
-
 
 
 
