@@ -36,6 +36,10 @@
     .studs-bg { background-color: #0284c7; background-image: radial-gradient(circle at center, rgba(255,255,255,0.22) 22%, transparent 24%), radial-gradient(circle at center, rgba(0,0,0,0.15) 24%, transparent 26%); background-size: 32px 32px; background-position: 0 0, 16px 16px; }
     .avatar-bounce { animation: avatarBounce 0.4s alternate infinite ease-in-out; }
     @keyframes avatarBounce { from { transform: translateY(0); } to { transform: translateY(-7px); } }
+    .roblox-char { display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.85)); }
+    .roblox-head { width: 13px; height: 11px; background: #facc15; border: 1.5px solid #0f172a; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+    .roblox-head::after { content: '•‿•'; font-size: 6.5px; line-height: 1; color: #0f172a; font-weight: 900; }
+    .roblox-torso { width: 17px; height: 10px; border: 1.5px solid #0f172a; border-top: none; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 900; }
   </style>
 </head>
 <body class="studs-bg min-h-screen text-slate-800 flex flex-col justify-between overflow-x-hidden p-2 sm:p-4">
@@ -82,9 +86,9 @@
 
   <main class="max-w-7xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
     <div class="lg:col-span-8 flex flex-col items-center w-full">
-      <div class="relative w-full max-w-[780px] aspect-square bg-slate-900 border-8 border-slate-800 rounded-3xl p-2.5 sm:p-3.5 shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-[780px] aspect-square bg-[#182232] border-8 border-[#111827] rounded-3xl p-2 sm:p-3 shadow-2xl overflow-hidden">
         <canvas id="boardCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
-        <div id="gridContainer" class="w-full h-full grid grid-cols-10 grid-rows-10 gap-1 sm:gap-1.5 rounded-2xl overflow-hidden relative z-0"></div>
+        <div id="gridContainer" class="w-full h-full grid grid-cols-10 grid-rows-10 gap-1 sm:gap-1.5 rounded-xl overflow-hidden relative z-0"></div>
         <div id="particleContainer" class="absolute inset-0 pointer-events-none z-30"></div>
       </div>
     </div>
@@ -173,7 +177,6 @@
         </button>
       </div>
 
-      <!-- Tab 1: Offline -->
       <div id="tabOfflineContent" class="bg-white border-4 border-slate-900 rounded-2xl p-4 text-left">
         <h3 class="font-bungee text-sm text-slate-800 mb-1 flex items-center gap-1.5">
           <i class="fa-solid fa-user-group text-emerald-600"></i> Main Serta-Merta (Satu Skrin)
@@ -192,7 +195,6 @@
         </button>
       </div>
 
-      <!-- Tab 2: Online -->
       <div id="tabOnlineContent" class="hidden bg-white border-4 border-slate-900 rounded-2xl p-4 text-left">
         <h3 class="font-bungee text-sm text-slate-800 mb-1 flex items-center gap-1.5">
           <i class="fa-solid fa-at text-indigo-600"></i> Log Masuk & Sambungan Bilik Online
@@ -226,7 +228,6 @@
         <div id="onlineStatusMessage" class="hidden mt-2 p-2 rounded-xl text-[11px] font-bold text-center border"></div>
       </div>
 
-      <!-- Tab 3: Versus AI -->
       <div id="tabAIContent" class="hidden bg-white border-4 border-slate-900 rounded-2xl p-4 text-left">
         <h3 class="font-bungee text-sm text-slate-800 mb-1 flex items-center gap-1.5">
           <i class="fa-solid fa-robot text-purple-600"></i> Cabaran Solo Lawan Komputer (1v1)
@@ -392,7 +393,7 @@
     }
   </script>
 
-  <!-- Main Game + Versus AI Logic -->
+  <!-- Main Game + Board Graphics Matching Reference + Versus AI -->
   <script>
     const PLAYER_TEMPLATES = [
       { name: "Noob Biru", color: "#2563eb", bgClass: "bg-blue-600", borderClass: "border-blue-800", badge: "🔵" },
@@ -400,8 +401,10 @@
       { name: "Builder Hijau", color: "#16a34a", bgClass: "bg-emerald-600", borderClass: "border-emerald-800", badge: "🟢" },
       { name: "Pro Kuning", color: "#d97706", bgClass: "bg-amber-500", borderClass: "border-amber-700", badge: "🟡" }
     ];
-    const LADDERS = { 4: 25, 13: 46, 33: 49, 42: 63, 50: 69, 62: 81, 74: 92 };
-    const SNAKES = { 27: 5, 40: 3, 43: 18, 54: 31, 66: 45, 76: 58, 89: 53, 99: 41 };
+
+    /* Kedudukan Tangga & Ular Sebiji Gambar Rujukan */
+    const LADDERS = { 4: 16, 12: 33, 28: 55, 36: 44, 51: 72, 71: 92, 80: 99 };
+    const SNAKES = { 30: 8, 47: 15, 56: 19, 73: 53, 87: 57, 94: 64, 98: 78 };
 
     let gameMode = 'offline', vsAIMode = false, aiDifficulty = 0.75;
     let currentRoomId = null, myPlayerIndex = 0, offlinePlayerCount = 2;
@@ -427,7 +430,6 @@
       document.getElementById('tabOfflineBtn').className = tab === 'offline' ? active : inactive;
       document.getElementById('tabOnlineBtn').className = tab === 'online' ? active : inactive;
       document.getElementById('tabAIBtn').className = tab === 'ai' ? active : inactive;
-
       document.getElementById('tabOfflineContent').classList.toggle('hidden', tab !== 'offline');
       document.getElementById('tabOnlineContent').classList.toggle('hidden', tab !== 'online');
       document.getElementById('tabAIContent').classList.toggle('hidden', tab !== 'ai');
@@ -556,20 +558,39 @@
       renderScoreboards(); renderPlayerTokens(); updateTurnUI();
     }
 
+    /* Petak 5 Warna Terang Sebiji Gambar Rujukan */
     function buildBoardGrid() {
       const container = document.getElementById('gridContainer'); container.innerHTML = '';
+      const tileColors = [
+        'bg-[#3b82f6] border-[#2563eb]', // Biru
+        'bg-[#10b981] border-[#059669]', // Hijau
+        'bg-[#f59e0b] border-[#d97706]', // Kuning/Oren
+        'bg-[#8b5cf6] border-[#7c3aed]', // Ungu
+        'bg-[#ef4444] border-[#dc2626]'  // Merah
+      ];
+
       for (let row = 9; row >= 0; row--) {
         const even = row % 2 === 0;
         for (let col = 0; col < 10; col++) {
           const cellNum = even ? row * 10 + col + 1 : row * 10 + (10 - col);
           const cell = document.createElement('div'); cell.id = `cell-${cellNum}`;
-          let bg = (row + col) % 2 === 0 ? 'bg-slate-100 text-slate-800' : 'bg-sky-100 text-sky-950', icon = '';
-          if (cellNum === 100) { bg = 'bg-yellow-400 text-slate-950 ring-2 ring-yellow-500'; icon = '<span class="text-xs sm:text-base">👑</span>'; }
-          else if (cellNum === 1) { bg = 'bg-emerald-300 text-emerald-950'; icon = '<span class="text-[10px] font-bungee">MULA</span>'; }
-          else if (LADDERS[cellNum]) { bg = 'bg-emerald-200 text-emerald-900'; icon = `<span class="text-[9px] sm:text-[11px] font-bold text-emerald-700">🪜→${LADDERS[cellNum]}</span>`; }
-          else if (SNAKES[cellNum]) { bg = 'bg-rose-200 text-rose-900'; icon = `<span class="text-[9px] sm:text-[11px] font-bold text-rose-700">🐍→${SNAKES[cellNum]}</span>`; }
-          cell.className = `${bg} rounded-md sm:rounded-lg p-0.5 sm:p-1 flex flex-col justify-between relative select-none shadow-inner`;
-          cell.innerHTML = `<div class="flex justify-between items-start leading-none"><span class="font-bungee text-[10px] sm:text-xs opacity-80">${cellNum}</span>${icon}</div><div id="tokens-${cellNum}" class="flex flex-wrap items-center justify-center gap-0.5 min-h-[16px] z-20"></div>`;
+          const colorClass = tileColors[(row * 3 + col) % tileColors.length];
+          let badge = '';
+
+          if (LADDERS[cellNum]) {
+            badge = `<span class="bg-[#065f46] text-white text-[8px] sm:text-[9px] font-bungee px-1 py-0.5 rounded shadow">▲ ${LADDERS[cellNum]}</span>`;
+          } else if (SNAKES[cellNum]) {
+            badge = `<span class="bg-[#7f1d1d] text-white text-[8px] sm:text-[9px] font-bungee px-1 py-0.5 rounded shadow">▼ ${SNAKES[cellNum]}</span>`;
+          }
+
+          cell.className = `${colorClass} border-b-4 rounded-md sm:rounded-lg p-1 sm:p-1.5 flex flex-col justify-between relative select-none text-white shadow`;
+          cell.innerHTML = `
+            <div class="flex justify-between items-start leading-none">
+              <span class="font-bungee text-[10px] sm:text-xs drop-shadow-[0_1px_1px_rgba(0,0,0,0.65)]">${cellNum}</span>
+              ${badge}
+            </div>
+            <div id="tokens-${cellNum}" class="flex flex-wrap items-center justify-center gap-0.5 min-h-[18px] z-20"></div>
+          `;
           container.appendChild(cell);
         }
       }
@@ -582,34 +603,85 @@
       return { x: cr.left - cvr.left + cr.width / 2, y: cr.top - cvr.top + cr.height / 2 };
     }
 
+    /* Lukisan Tangga Kuning-Putih & Ular Merah Belang Kuning Sebiji Gambar */
     function drawSnakesAndLadders() {
       const canvas = document.getElementById('boardCanvas'); if (!canvas) return;
       canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
       const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // 1. Tangga (Rel Kuning + Anak Tangga Putih)
       Object.entries(LADDERS).forEach(([s, e]) => {
         const p1 = getCellCenter(Number(s)), p2 = getCellCenter(Number(e));
-        const perp = Math.atan2(p2.y - p1.y, p2.x - p1.x) + Math.PI / 2, ox = Math.cos(perp) * 9, oy = Math.sin(perp) * 9;
-        ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#92400e'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(p1.x - ox, p1.y - oy); ctx.lineTo(p2.x - ox, p2.y - oy); ctx.moveTo(p1.x + ox, p1.y + oy); ctx.lineTo(p2.x + ox, p2.y + oy); ctx.stroke();
-        const steps = Math.max(3, Math.floor(Math.hypot(p2.x - p1.x, p2.y - p1.y) / 22));
-        ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 3;
+        const perp = Math.atan2(p2.y - p1.y, p2.x - p1.x) + Math.PI / 2;
+        const railOffset = 9;
+        const ox = Math.cos(perp) * railOffset, oy = Math.sin(perp) * railOffset;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 3;
+
+        // Anak tangga putih dahulu
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const steps = Math.max(4, Math.floor(dist / 17));
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3.5;
         for (let i = 1; i < steps; i++) {
-          const t = i / steps, rx = p1.x + (p2.x - p1.x) * t, ry = p1.y + (p2.y - p1.y) * t;
+          const t = i / steps;
+          const rx = p1.x + (p2.x - p1.x) * t, ry = p1.y + (p2.y - p1.y) * t;
           ctx.beginPath(); ctx.moveTo(rx - ox, ry - oy); ctx.lineTo(rx + ox, ry + oy); ctx.stroke();
         }
+
+        // Rel kiri & kanan kuning emas
+        [[-ox, -oy], [ox, oy]].forEach(([dx, dy]) => {
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.moveTo(p1.x + dx, p1.y + dy); ctx.lineTo(p2.x + dx, p2.y + dy); ctx.stroke();
+        });
         ctx.restore();
       });
 
+      // 2. Ular Merah Melengkung dengan Garis Putus-putus Kuning & Mata Putih
       Object.entries(SNAKES).forEach(([h, t]) => {
         const p1 = getCellCenter(Number(h)), p2 = getCellCenter(Number(t));
-        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2, perp = Math.atan2(p2.y - p1.y, p2.x - p1.x) + Math.PI / 2;
-        ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#991b1b'; ctx.lineWidth = 9;
-        ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
-        ctx.bezierCurveTo((p1.x + midX) / 2 + Math.cos(perp) * 28, (p1.y + midY) / 2 + Math.sin(perp) * 28, (midX + p2.x) / 2 - Math.cos(perp) * 28, (midY + p2.y) / 2 - Math.sin(perp) * 28, p2.x, p2.y);
-        ctx.stroke();
-        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2); ctx.fill();
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const perp = Math.atan2(dy, dx) + Math.PI / 2;
+        const curveOffset = Math.min(34, Math.hypot(dx, dy) * 0.18);
+        const cpx = (p1.x + p2.x) / 2 + Math.cos(perp) * curveOffset;
+        const cpy = (p1.y + p2.y) / 2 + Math.sin(perp) * curveOffset;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 3;
+
+        // Badan ular merah terang
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = 9;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
+
+        // Garis putus-putus kuning di tengah badan
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Kepala ular bulat merah
+        ctx.fillStyle = '#b91c1c';
+        ctx.beginPath(); ctx.arc(p1.x, p1.y, 9, 0, Math.PI * 2); ctx.fill();
+
+        // Sepasang mata bulat putih dengan anak mata hitam
+        [-3.2, 3.2].forEach(exOff => {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(p1.x + exOff, p1.y - 1, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath(); ctx.arc(p1.x + exOff, p1.y - 1, 1.2, 0, Math.PI * 2); ctx.fill();
+        });
+
         ctx.restore();
       });
     }
@@ -628,10 +700,13 @@
       for (let i = 1; i <= 100; i++) { const h = document.getElementById(`tokens-${i}`); if (h) h.innerHTML = ''; }
       players.forEach((p, idx) => {
         const holder = document.getElementById(`tokens-${p.pos}`); if (!holder) return;
-        const token = document.createElement('div');
-        token.className = `w-4 h-4 sm:w-5 sm:h-5 rounded-md ${p.bgClass} border-2 border-white shadow-md flex items-center justify-center text-[9px] text-white font-bold ${idx === currentTurn ? 'avatar-bounce ring-2 ring-yellow-400' : ''}`;
-        token.textContent = p.isAI ? 'AI' : idx + 1;
-        holder.appendChild(token);
+        const avatar = document.createElement('div');
+        avatar.className = `roblox-char ${idx === currentTurn ? 'avatar-bounce' : ''}`;
+        avatar.innerHTML = `
+          <div class="roblox-head" style="${p.isAI ? 'background:#c4b5fd;' : ''}"></div>
+          <div class="roblox-torso ${p.bgClass}">${p.isAI ? 'AI' : idx + 1}</div>
+        `;
+        holder.appendChild(avatar);
       });
     }
 
