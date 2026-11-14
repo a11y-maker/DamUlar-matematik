@@ -1,4 +1,782 @@
-gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dam Ular Matematik - Roblox Edition</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Fredoka & Bungee for Roblox vibe -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- PeerJS WebRTC P2P Multiplayer Library for Real-time Cross-Device Online Rooms -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Fredoka', cursive, sans-serif;
+      user-select: none;
+    }
+    .font-bungee {
+      font-family: 'Bungee', cursive, sans-serif;
+    }
+    /* Roblox style beveled blocky 3D buttons */
+    .roblox-btn {
+      transition: all 0.08s ease-in-out;
+      box-shadow: 0 8px 0px rgba(0, 0, 0, 0.35);
+      border-bottom: 4px solid rgba(0, 0, 0, 0.25);
+    }
+    .roblox-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 0px rgba(0, 0, 0, 0.35);
+    }
+    .roblox-btn:active {
+      transform: translateY(6px);
+      box-shadow: 0 2px 0px rgba(0, 0, 0, 0.35);
+    }
+    .roblox-panel {
+      box-shadow: 0 12px 0px rgba(0, 0, 0, 0.25), 0 0 25px rgba(0,0,0,0.2);
+    }
+    /* 3D Dice styling */
+    .die {
+      width: 58px;
+      height: 58px;
+      background: white;
+      border-radius: 14px;
+      border: 4px solid #1e293b;
+      box-shadow: 0 6px 0px #0f172a, inset 0 -3px 0 rgba(0,0,0,0.1);
+      display: grid;
+      grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+      padding: 6px;
+      box-sizing: border-box;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      background-color: #0f172a;
+      border-radius: 50%;
+      align-self: center;
+      justify-self: center;
+    }
+    .rolling {
+      animation: diceRoll 0.6s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+    }
+    @keyframes diceRoll {
+      0% { transform: rotate(0deg) scale(1.1) translateY(-6px); }
+      25% { transform: rotate(90deg) scale(1.2) translateY(-14px); }
+      50% { transform: rotate(180deg) scale(1.1) translateY(-4px); }
+      75% { transform: rotate(270deg) scale(1.2) translateY(-10px); }
+      100% { transform: rotate(360deg) scale(1.1) translateY(-6px); }
+    }
+    /* Roblox floating text popups */
+    .float-text {
+      position: absolute;
+      font-family: 'Bungee', cursive;
+      pointer-events: none;
+      animation: floatUpFade 1.2s forwards ease-out;
+      font-size: 26px;
+      font-weight: 900;
+      text-shadow: 3px 3px 0px #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+      z-index: 100;
+    }
+    @keyframes floatUpFade {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.6) rotate(-5deg); }
+      50% { transform: translate(-50%, -45px) scale(1.3) rotate(4deg); }
+      100% { opacity: 0; transform: translate(-50%, -90px) scale(1.1); }
+    }
+    /* Roblox Stud Pattern */
+    .studs-bg {
+      background-color: #0284c7;
+      background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.22) 22%, transparent 24%),
+                        radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 24%, transparent 26%);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+    }
+    /* Player avatar bounce */
+    .avatar-bounce {
+      animation: avatarBounce 0.4s alternate infinite ease-in-out;
+    }
+    @keyframes avatarBounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-7px); }
+    }
+  </style>
+</head>
+<body class="studs-bg min-h-screen text-slate-800 flex flex-col justify-between overflow-x-hidden p-2 sm:p-4">
+
+  <!-- Top Roblox Bar: Status & Scores -->
+  <header class="max-w-6xl mx-auto w-full mb-3">
+    <div class="bg-yellow-400 border-4 border-yellow-600 rounded-3xl p-3 sm:p-4 roblox-panel flex flex-wrap justify-between items-center gap-3">
+      <!-- Title & Roblox Logo style -->
+      <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 bg-red-600 border-4 border-white rounded-xl shadow-lg flex items-center justify-center transform -rotate-6">
+          <i class="fa-solid fa-cube text-white text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="font-bungee text-xl sm:text-2xl text-slate-900 tracking-wider flex items-center gap-2">
+            DAM ULAR ROBLOX 
+            <span id="modeBadge" class="bg-emerald-600 text-white text-xs px-2.5 py-0.5 rounded-full font-sans font-bold shadow-sm">
+              MOD TEMPATAN
+            </span>
+          </h1>
+          <p id="roomInfoText" class="text-xs sm:text-sm font-bold text-yellow-950">
+            Selesaikan Math Darjah 4-6 & Bersaing Menang!
+          </p>
+        </div>
+      </div>
+
+      <!-- Controls: Mode Switcher, Player Count & Sound -->
+      <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+        <!-- Tukar Mod Butang -->
+        <button onclick="openLobbyModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bungee text-xs sm:text-sm px-3.5 py-2 rounded-2xl border-2 border-indigo-800 shadow flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-earth-americas"></i>
+          <span id="lobbyBtnText">PILIH MOD</span>
+        </button>
+
+        <!-- Bilangan Pemain Selector (Hanya untuk Mod Offline) -->
+        <div id="playerCountContainer" class="bg-slate-900 border-2 border-slate-700 text-white px-3 py-1.5 rounded-2xl flex items-center gap-2 shadow-inner">
+          <i class="fa-solid fa-users text-cyan-400 text-sm"></i>
+          <span class="text-xs font-bold text-slate-300 hidden sm:inline">Pemain:</span>
+          <select id="playerCountSelect" onchange="changePlayerCount(parseInt(this.value))" class="bg-slate-800 text-yellow-400 font-bungee text-sm rounded-lg px-2 py-1 outline-none border border-slate-600 cursor-pointer">
+            <option value="2">2 Orang</option>
+            <option value="3">3 Orang</option>
+            <option value="4">4 Orang</option>
+          </select>
+        </div>
+
+        <!-- Butang Audio Mute/Unmute -->
+        <button id="soundToggleBtn" onclick="toggleMute()" class="w-10 h-10 bg-white border-2 border-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-100 transition shadow">
+          <i id="soundIcon" class="fa-solid fa-volume-high text-slate-700"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Multiplayer Scoreboards / Status Cards -->
+    <div id="multiplayerBar" class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mt-3">
+      <!-- Populated dynamically via renderScoreboards() -->
+    </div>
+  </header>
+
+  <!-- Main Game Stage -->
+  <main class="max-w-7xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+    
+    <!-- Left Column: The Board (10x10 Snake & Ladder) -->
+    <div class="lg:col-span-8 flex flex-col items-center w-full">
+      <div class="relative w-full max-w-[780px] aspect-square bg-slate-900 border-8 border-slate-800 rounded-3xl p-2.5 sm:p-3.5 shadow-2xl overflow-hidden">
+        <!-- Canvas for Snakes, Ladders, and smooth path connecting tiles -->
+        <canvas id="boardCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+        
+        <!-- 100 Grid Cells Container -->
+        <div id="gridContainer" class="w-full h-full grid grid-cols-10 grid-rows-10 gap-1 sm:gap-1.5 rounded-2xl overflow-hidden relative z-0">
+          <!-- Petak 1-100 dijanakan melalui JavaScript -->
+        </div>
+
+        <!-- Floating Particles Overlay -->
+        <div id="particleContainer" class="absolute inset-0 pointer-events-none z-30"></div>
+      </div>
+    </div>
+
+    <!-- Right Column: Control Center, 2 Dices, Math Questions & Actions -->
+    <div class="lg:col-span-4 flex flex-col gap-3 w-full">
+      
+      <!-- Panel Dadu & Butang Putar -->
+      <div class="bg-white border-4 border-slate-800 rounded-3xl p-5 roblox-panel flex flex-col items-center">
+        <h2 class="font-bungee text-base text-slate-800 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-dice text-red-500 text-xl"></i> 2 DADU ROBLOX
+        </h2>
+
+        <!-- Dadu Kembar Display -->
+        <div class="flex items-center gap-5 my-2">
+          <!-- Dadu 1 -->
+          <div id="dice1" class="die"></div>
+          <!-- Sign Tambah -->
+          <span class="font-bungee text-2xl text-slate-700">+</span>
+          <!-- Dadu 2 -->
+          <div id="dice2" class="die"></div>
+        </div>
+
+        <div id="diceSumText" class="font-bungee text-slate-700 text-sm mt-1 mb-2">
+          Jumlah Langkah: <span class="text-blue-600 text-lg">?</span>
+        </div>
+
+        <!-- Giliran Aktif Label -->
+        <div id="activePlayerTurnBanner" class="w-full py-1.5 px-3 mb-2 rounded-xl text-center text-xs sm:text-sm font-bungee tracking-wide border-2"></div>
+
+        <!-- Butang Putarkan 2 Dadu Serentak -->
+        <button id="rollDiceBtn" onclick="handleRollDice()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bungee text-lg py-3 px-6 rounded-2xl roblox-btn border-emerald-700 flex items-center justify-center gap-3">
+          <i class="fa-solid fa-shuffle text-2xl"></i> PUTARKAN DADU!
+        </button>
+      </div>
+
+      <!-- Kotak Misi Matematik (Math Challenge Card) -->
+      <div id="mathCard" class="bg-white border-4 border-slate-800 rounded-3xl p-5 roblox-panel flex flex-col justify-between transition-all duration-300">
+        
+        <!-- Header Misi -->
+        <div class="flex items-center justify-between border-b-2 border-slate-200 pb-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="bg-indigo-600 text-white text-xs px-2.5 py-1 rounded-lg font-bungee tracking-wide">
+              CABARAN MATH
+            </span>
+            <span id="topicBadge" class="text-xs font-bold text-indigo-700">Darjah 4-6</span>
+          </div>
+          <div id="timerBadge" class="hidden bg-red-100 text-red-600 font-bungee text-xs px-2 py-1 rounded-md border border-red-300">
+            <i class="fa-regular fa-clock mr-1"></i><span id="timerSeconds">30</span>s
+          </div>
+        </div>
+
+        <!-- Status / Soalan -->
+        <div id="mathPromptContainer" class="py-2 text-center">
+          <div id="waitingPrompt" class="py-6">
+            <div class="w-16 h-16 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 text-3xl mb-2">
+              <i class="fa-solid fa-lightbulb"></i>
+            </div>
+            <p id="waitingPromptText" class="font-bold text-slate-600 text-sm">Putar 2 dadu dahulu untuk menerima cabaran pengiraan matematik!</p>
+          </div>
+
+          <div id="activeQuestionPrompt" class="hidden text-left">
+            <p id="questionText" class="text-base sm:text-lg font-bold text-slate-800 mb-3 bg-indigo-50 p-3 rounded-xl border border-indigo-200 shadow-sm leading-snug"></p>
+
+            <!-- 4 Butang Pilihan Jawapan -->
+            <div id="optionsGrid" class="grid grid-cols-2 gap-2 mt-2"></div>
+          </div>
+        </div>
+
+        <!-- Info & Tips Ringkas -->
+        <div class="mt-4 pt-3 border-t-2 border-slate-100 text-xs text-slate-500 font-semibold flex items-center justify-between">
+          <span class="text-emerald-600"><i class="fa-solid fa-circle-check mr-1"></i>Betul: Gerak + Markah</span>
+          <span class="text-red-500"><i class="fa-solid fa-circle-xmark mr-1"></i>Salah: Tolak Markah</span>
+        </div>
+      </div>
+
+      <!-- Log Aktiviti Roblox -->
+      <div class="bg-slate-900 border-4 border-slate-800 rounded-3xl p-4 text-white roblox-panel">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-bungee text-xs tracking-wider text-yellow-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-bullhorn"></i> LOG PERMAINAN
+          </span>
+          <button onclick="resetGame()" class="text-[11px] font-bold text-slate-400 hover:text-white underline">Mula Semula</button>
+        </div>
+        <div id="gameLog" class="text-xs space-y-1.5 h-24 overflow-y-auto pr-1 text-slate-300 font-mono">
+          <div class="text-yellow-300">★ Selamat datang ke Dam Ular Roblox Matematik! Tekan dadu untuk mula.</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modal Pilih Mod: Terus Main ATAU Multiplayer Online -->
+  <div id="lobbyModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-yellow-400 border-8 border-slate-900 rounded-3xl max-w-lg w-full p-6 text-center roblox-panel relative">
+      <div class="w-20 h-20 bg-red-600 border-4 border-white rounded-3xl mx-auto -mt-16 shadow-2xl flex items-center justify-center text-white text-4xl">
+        <i class="fa-solid fa-gamepad"></i>
+      </div>
+      
+      <h2 class="font-bungee text-2xl sm:text-3xl text-slate-900 mt-3 tracking-wide">PILIHAN MOD PERMAINAN</h2>
+      <p class="font-bold text-yellow-950 text-xs sm:text-sm mb-4">Sila pilih cara anda ingin bermain hari ini:</p>
+
+      <!-- Tabs: Mod Terus Main & Mod Online -->
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <button id="tabOfflineBtn" onclick="switchLobbyTab('offline')" class="py-2.5 px-3 rounded-xl font-bungee text-xs sm:text-sm bg-slate-900 text-yellow-400 border-2 border-slate-900">
+          <i class="fa-solid fa-house mr-1"></i> Terus Main (Offline)
+        </button>
+        <button id="tabOnlineBtn" onclick="switchLobbyTab('online')" class="py-2.5 px-3 rounded-xl font-bungee text-xs sm:text-sm bg-yellow-300 text-slate-800 border-2 border-yellow-500">
+          <i class="fa-solid fa-globe mr-1"></i> Multiplayer Online
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Main Terus (Offline) -->
+      <div id="tabOfflineContent" class="bg-white border-4 border-slate-900 rounded-2xl p-4 text-left">
+        <h3 class="font-bungee text-sm text-slate-800 mb-1 flex items-center gap-1.5">
+          <i class="fa-solid fa-user-group text-emerald-600"></i> Main Serta-Merta (Satu Skrin)
+        </h3>
+        <p class="text-xs text-slate-600 mb-4 font-semibold">
+          Kongsi peranti dengan kawan atau keluarga secara bergilir-gilir (2 hingga 4 orang pemain).
+        </p>
+
+        <div class="mb-4">
+          <label class="block text-xs font-bungee text-slate-700 mb-1">Pilih Bilangan Pemain:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="selectQuickPlayerCount(2)" id="quickP2" class="py-2 rounded-xl font-bungee text-xs border-2 border-slate-800 bg-emerald-500 text-white">2 Orang</button>
+            <button onclick="selectQuickPlayerCount(3)" id="quickP3" class="py-2 rounded-xl font-bungee text-xs border-2 border-slate-800 bg-slate-100 text-slate-800">3 Orang</button>
+            <button onclick="selectQuickPlayerCount(4)" id="quickP4" class="py-2 rounded-xl font-bungee text-xs border-2 border-slate-800 bg-slate-100 text-slate-800">4 Orang</button>
+          </div>
+        </div>
+
+        <button onclick="startOfflineMode()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bungee text-base py-3 rounded-2xl roblox-btn border-emerald-700 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-play"></i> TERUSKAN PERMAINAN
+        </button>
+      </div>
+
+      <!-- Tab Content 2: Multiplayer Online dengan Login E-mel -->
+      <div id="tabOnlineContent" class="hidden bg-white border-4 border-slate-900 rounded-2xl p-4 text-left">
+        <h3 class="font-bungee text-sm text-slate-800 mb-1 flex items-center gap-1.5">
+          <i class="fa-solid fa-at text-indigo-600"></i> Log Masuk & Sambungan Bilik Online
+        </h3>
+        <p class="text-xs text-slate-600 mb-3 font-semibold">
+          Masukkan e-mel & nama anda untuk mencipta bilik atau menyertai kawan anda secara dalam talian.
+        </p>
+
+        <!-- Form Input E-mel & Nama -->
+        <div class="space-y-2 mb-3">
+          <div>
+            <label class="block text-[11px] font-bungee text-slate-700">Nama Pemain Roblox:</label>
+            <input id="onlinePlayerName" type="text" placeholder="Contoh: ProMathGamer" class="w-full bg-slate-50 border-2 border-slate-400 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-600">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bungee text-slate-700">E-mel Pelajar / Pengguna:</label>
+            <input id="onlinePlayerEmail" type="email" placeholder="nama@sekolah.edu.my" class="w-full bg-slate-50 border-2 border-slate-400 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-indigo-600">
+          </div>
+        </div>
+
+        <!-- Pilihan Buat Bilik atau Masuk Bilik -->
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t-2 border-slate-100">
+          <div class="space-y-1.5">
+            <button onclick="createOnlineRoom()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bungee text-xs py-2.5 rounded-xl border-2 border-indigo-800 shadow">
+              <i class="fa-solid fa-plus-circle mr-1"></i> BINA BILIK (HOST)
+            </button>
+            <p class="text-[10px] text-slate-500 leading-tight">Cipta kod bilik baharu dan jemput rakan.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex gap-1">
+              <input id="joinRoomCodeInput" type="text" maxlength="6" placeholder="KOD BILIK" class="w-full uppercase text-center font-bungee text-xs bg-slate-50 border-2 border-slate-400 rounded-xl px-1 py-1 text-slate-800">
+              <button onclick="joinOnlineRoom()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bungee text-xs px-2.5 py-1 rounded-xl border-2 border-cyan-800">
+                MASUK
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-500 leading-tight">Masukkan kod 4-angka yang diberikan oleh rakan.</p>
+          </div>
+        </div>
+
+        <div id="onlineStatusMessage" class="hidden mt-2 p-2 rounded-xl text-[11px] font-bold text-center border"></div>
+      </div>
+
+      <button onclick="closeLobbyModal()" id="closeLobbyBtn" class="mt-3 text-xs font-bungee text-slate-800 hover:text-black underline block mx-auto">
+        Tutup & Kekalkan Mod Semasa
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Kemenangan Roblox GG (Game Finished) -->
+  <div id="victoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-yellow-400 border-8 border-slate-900 rounded-3xl max-w-md w-full p-6 text-center roblox-panel transform transition-all scale-95 animate-in">
+      <div class="w-24 h-24 bg-red-600 border-4 border-white rounded-3xl mx-auto -mt-16 shadow-2xl flex items-center justify-center text-white text-5xl">
+        🏆
+      </div>
+      <h2 id="winnerTitle" class="font-bungee text-3xl text-slate-900 mt-4 tracking-wide">PEMAIN MENANG!</h2>
+      <p id="winnerSubtitle" class="font-bold text-yellow-950 text-sm mt-1">Tahniah! Anda berjaya sampai ke Petak 100 dahulu!</p>
+
+      <div class="bg-white border-4 border-slate-900 rounded-2xl p-4 my-4">
+        <div class="text-xs uppercase font-bungee text-slate-500">Jumlah Skor Robux</div>
+        <div id="finalScore" class="font-bungee text-4xl text-emerald-600">0</div>
+        <div id="accuracyStats" class="text-xs font-bold text-slate-700 mt-1">Ketepatan Menjawab: 100%</div>
+      </div>
+
+      <button onclick="resetGame()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bungee text-lg py-3 rounded-2xl roblox-btn border-emerald-700">
+        <i class="fa-solid fa-rotate-right mr-2"></i> MAIN SEKALI LAGI
+      </button>
+    </div>
+  </div>
+
+  <!-- Network & Online Multiplayer Engine (Hybrid WebRTC PeerJS + Cross-Tab Sync) -->
+  <script>
+    let peerInstance = null;
+    let peerConnections = [];
+    let hostConnection = null;
+    let isRoomHost = false;
+    let crossTabChannel = null;
+
+    try {
+      if (window.BroadcastChannel) {
+        crossTabChannel = new BroadcastChannel('roblox_dam_sync_channel');
+        crossTabChannel.onmessage = (ev) => {
+          if (ev.data && ev.data.roomId === currentRoomId && window.handleOnlineRoomUpdate) {
+            window.handleOnlineRoomUpdate(ev.data.payload);
+          }
+        };
+      }
+    } catch(e) {
+      console.warn("BroadcastChannel not supported", e);
+    }
+
+    window.OnlineMultiplayer = {
+      initHost(roomId, initialData, onClientUpdate) {
+        isRoomHost = true;
+        peerConnections = [];
+        
+        return new Promise((resolve) => {
+          const peerId = 'dam-ular-' + roomId;
+          
+          if (peerInstance) {
+            try { peerInstance.destroy(); } catch(e){}
+          }
+
+          peerInstance = new Peer(peerId, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+              ]
+            }
+          });
+
+          peerInstance.on('open', (id) => {
+            console.log("Bilik Awan dibuka dengan ID:", id);
+            resolve(true);
+          });
+
+          peerInstance.on('connection', (conn) => {
+            peerConnections.push(conn);
+            conn.on('open', () => {
+              conn.send({ type: 'ROOM_STATE', payload: window.getRoomState() });
+            });
+            conn.on('data', (msg) => {
+              if (msg && msg.type === 'PLAYER_JOIN') {
+                if (window.handlePlayerJoinRequest) {
+                  window.handlePlayerJoinRequest(msg.player, conn);
+                }
+              } else if (msg && msg.type === 'ACTION') {
+                onClientUpdate(msg.payload);
+                window.OnlineMultiplayer.broadcast(msg.payload);
+              }
+            });
+            conn.on('close', () => {
+              peerConnections = peerConnections.filter(c => c !== conn);
+            });
+          });
+
+          peerInstance.on('error', (err) => {
+            console.warn("PeerJS Host Error:", err);
+            resolve(true);
+          });
+        });
+      },
+
+      connectToRoom(roomId, onDataReceived) {
+        isRoomHost = false;
+        return new Promise((resolve) => {
+          const peerId = 'dam-ular-client-' + Math.floor(1000 + Math.random() * 9000);
+          
+          if (peerInstance) {
+            try { peerInstance.destroy(); } catch(e){}
+          }
+
+          peerInstance = new Peer(peerId, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+              ]
+            }
+          });
+
+          let timeout = setTimeout(() => {
+            resolve(true);
+          }, 3500);
+
+          peerInstance.on('open', () => {
+            const hostId = 'dam-ular-' + roomId;
+            hostConnection = peerInstance.connect(hostId, { reliable: true });
+
+            hostConnection.on('open', () => {
+              clearTimeout(timeout);
+              resolve(true);
+            });
+
+            hostConnection.on('data', (msg) => {
+              if (msg && msg.payload) {
+                onDataReceived(msg.payload);
+              }
+            });
+
+            hostConnection.on('error', (e) => {
+              console.warn("Sambungan host gagal:", e);
+            });
+          });
+
+          peerInstance.on('error', (err) => {
+            clearTimeout(timeout);
+            resolve(true);
+          });
+        });
+      },
+
+      broadcast(payload) {
+        if (isRoomHost) {
+          peerConnections.forEach(conn => {
+            if (conn.open) {
+              try { conn.send({ type: 'ROOM_STATE', payload }); } catch(e){}
+            }
+          });
+        } else if (hostConnection && hostConnection.open) {
+          try { hostConnection.send({ type: 'ACTION', payload }); } catch(e){}
+        }
+
+        if (crossTabChannel && currentRoomId) {
+          try {
+            crossTabChannel.postMessage({ roomId: currentRoomId, payload });
+          } catch(e){}
+        }
+      },
+
+      leave() {
+        if (peerConnections) {
+          peerConnections.forEach(c => { try { c.close(); } catch(e){} });
+          peerConnections = [];
+        }
+        if (hostConnection) {
+          try { hostConnection.close(); } catch(e){}
+          hostConnection = null;
+        }
+        if (peerInstance) {
+          try { peerInstance.destroy(); } catch(e){}
+          peerInstance = null;
+        }
+      }
+    };
+  </script>
+
+  <!-- Audio Context Generator -->
+  <script>
+    let audioCtx = null;
+    let isMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      const icon = document.getElementById('soundIcon');
+      if (isMuted) {
+        icon.className = 'fa-solid fa-volume-xmark text-red-500';
+      } else {
+        icon.className = 'fa-solid fa-volume-high text-slate-700';
+        playRobloxBeep(440, 0.05);
+      }
+    }
+
+    function playRobloxOof() {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+
+      osc.frequency.setValueAtTime(330, now);
+      osc.frequency.exponentialRampToValueAtTime(115, now + 0.22);
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(680, now);
+      filter.frequency.exponentialRampToValueAtTime(380, now + 0.22);
+      filter.Q.value = 3.5;
+
+      gain.gain.setValueAtTime(0.55, now);
+      gain.gain.linearRampToValueAtTime(0.001, now + 0.24);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.24);
+    }
+
+    function playSuccessChime() {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      
+      notes.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+
+        const startTime = now + (idx * 0.065);
+        gain.gain.setValueAtTime(0.28, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.22);
+      });
+    }
+
+    function playDiceClatter(intensity = 1.0) {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(320 + Math.random() * 260, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.04);
+
+      gain.gain.setValueAtTime(0.22 * intensity, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    }
+
+    function playDiceLand() {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    function playFootstep(stepIndex = 0) {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      
+      const pitch = 380 + ((stepIndex % 3) * 60);
+      osc.frequency.setValueAtTime(pitch, now);
+      osc.frequency.exponentialRampToValueAtTime(pitch * 0.5, now + 0.05);
+
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    }
+
+    function playLadderSound() {
+      if (isMuted) return;
+      initAudio();
+      const freqs = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = f;
+        const st = audioCtx.currentTime + (i * 0.055);
+        gain.gain.setValueAtTime(0.14, st);
+        gain.gain.exponentialRampToValueAtTime(0.001, st + 0.14);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(st);
+        osc.stop(st + 0.14);
+      });
+    }
+
+    function playSnakeSound() {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(680, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.45);
+
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    }
+
+    function playClockTick(isUrgent = false) {
+      if (isMuted) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = isUrgent ? 880 : 600;
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.04);
+    }
+
+    function playVictoryTrumpet() {
+      if (isMuted) return;
+      initAudio();
+      const notes = [
+        { f: 523.25, d: 0.15, offset: 0.0 },
+        { f: 523.25, d: 0.15, offset: 0.16 },
+        { f: 523.25, d: 0.15, offset: 0.32 },
+        { f: 659.25, d: 0.35, offset: 0.48 },
+        { f: 783.99, d: 0.25, offset: 0.85 },
+        { f: 1046.50, d: 0.70, offset: 1.10 }
+      ];
+
+      notes.forEach(({ f, d, offset }) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+
+        const st = audioCtx.currentTime + offset;
+        gain.gain.setValueAtTime(0.3, st);
+        gain.gain.exponentialRampToValueAtTime(0.001, st + d);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(st);
+        osc.stop(st + d);
+      });
+    }
+
+    function playRobloxBeep(freq = 480, duration = 0.08) {
+      if (isMuted) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start();
@@ -8,7 +786,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
 
   <!-- Main Game Logic -->
   <script>
-    // --- KONFIGURASI PERMAINAN ---
     const PLAYER_TEMPLATES = [
       { name: "Noob Biru", color: "#2563eb", bgClass: "bg-blue-600", borderClass: "border-blue-800", badge: "🔵" },
       { name: "Bacon Merah", color: "#dc2626", bgClass: "bg-red-600", borderClass: "border-red-800", badge: "🔴" },
@@ -16,7 +793,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       { name: "Pro Kuning", color: "#d97706", bgClass: "bg-amber-500", borderClass: "border-amber-700", badge: "🟡" }
     ];
 
-    // Tangga (Mula -> Tamat)
     const LADDERS = {
       4: 25,
       13: 46,
@@ -27,7 +803,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       74: 92
     };
 
-    // Ular (Kepala -> Ekor)
     const SNAKES = {
       27: 5,
       40: 3,
@@ -39,7 +814,7 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       99: 41
     };
 
-    let gameMode = 'offline'; // 'offline' | 'online'
+    let gameMode = 'offline';
     let currentRoomId = null;
     let myPlayerIndex = 0;
     let offlinePlayerCount = 2;
@@ -54,7 +829,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
     let questionTimer = null;
     let timeLeft = 30;
 
-    // --- INISIALISASI ---
     window.addEventListener('DOMContentLoaded', () => {
       buildBoardGrid();
       renderDieFace('dice1', 1);
@@ -65,7 +839,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
 
     window.addEventListener('resize', drawSnakesAndLadders);
 
-    // --- LOBBY & MOD PERMAINAN ---
     function openLobbyModal() {
       document.getElementById('lobbyModal').classList.remove('hidden');
     }
@@ -146,7 +919,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       updateTurnUI();
     }
 
-    // --- MULTIPLAYER ONLINE (WEBRTC / CROSS-TAB) ---
     function showOnlineStatus(msg, isError = false) {
       const box = document.getElementById('onlineStatusMessage');
       box.textContent = msg;
@@ -270,12 +1042,10 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       updateTurnUI();
     }
 
-    // --- PAPAN PERMAINAN 10x10 ---
     function buildBoardGrid() {
       const container = document.getElementById('gridContainer');
       container.innerHTML = '';
 
-      // Susunan Zig-Zag dari Petak 100 (atas kiri) ke Petak 1 (bawah kiri)
       for (let row = 9; row >= 0; row--) {
         const isEvenRowFromBottom = row % 2 === 0;
         for (let col = 0; col < 10; col++) {
@@ -337,14 +1107,12 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Lukis Tangga
       Object.entries(LADDERS).forEach(([start, end]) => {
         const p1 = getCellCenter(Number(start));
         const p2 = getCellCenter(Number(end));
         drawLadder(ctx, p1.x, p1.y, p2.x, p2.y);
       });
 
-      // Lukis Ular
       Object.entries(SNAKES).forEach(([head, tail]) => {
         const p1 = getCellCenter(Number(head));
         const p2 = getCellCenter(Number(tail));
@@ -363,7 +1131,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       ctx.save();
       ctx.lineCap = 'round';
 
-      // Batang kiri & kanan tangga
       ctx.strokeStyle = '#92400e';
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -373,7 +1140,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       ctx.lineTo(x2 + ox, y2 + oy);
       ctx.stroke();
 
-      // Anak tangga
       const dist = Math.hypot(x2 - x1, y2 - y1);
       const steps = Math.max(3, Math.floor(dist / 22));
       ctx.strokeStyle = '#f59e0b';
@@ -406,7 +1172,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       ctx.save();
       ctx.lineCap = 'round';
 
-      // Badan luar ular
       ctx.strokeStyle = '#991b1b';
       ctx.lineWidth = 9;
       ctx.beginPath();
@@ -414,20 +1179,17 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
       ctx.stroke();
 
-      // Jalur dalam ular
       ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 4;
       ctx.setLineDash([6, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Kepala ular
       ctx.fillStyle = '#dc2626';
       ctx.beginPath();
       ctx.arc(x1, y1, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      // Mata ular
       ctx.fillStyle = '#fef08a';
       ctx.beginPath();
       ctx.arc(x1 - 2.5, y1 - 2, 2, 0, Math.PI * 2);
@@ -436,7 +1198,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       ctx.restore();
     }
 
-    // --- PAPARAN SKOR & TOKEN PEMAIN ---
     function renderScoreboards() {
       const bar = document.getElementById('multiplayerBar');
       bar.innerHTML = '';
@@ -465,7 +1226,7 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
             </div>
           </div>
           <div class="text-right shrink-0 ml-2">
-            <div class="text-[10px] font-bold uppercase ${isActive ? 'text-slate-400' : 'text-slate-400'}">Robux</div>
+            <div class="text-[10px] font-bold uppercase text-slate-400">Robux</div>
             <div class="font-bungee text-sm sm:text-base ${isActive ? 'text-emerald-600' : 'text-yellow-400'}">${p.score}</div>
           </div>
         `;
@@ -511,7 +1272,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       rollBtn.classList.toggle('cursor-not-allowed', !canRoll);
     }
 
-    // --- DADU ROBLOX ---
     const DIE_PATTERNS = {
       1: [4],
       2: [0, 8],
@@ -578,7 +1338,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       }, 65);
     }
 
-    // --- PENJANA SOALAN MATEMATIK (DARJAH 4 - 6) ---
     function generateMathQuestion() {
       const topics = ['Darab & Bahagi', 'Pecahan & Perpuluhan', 'Peratus & Wang', 'Operasi Bergabung', 'Ukuran & Masa'];
       const topic = topics[Math.floor(Math.random() * topics.length)];
@@ -674,7 +1433,7 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
 
         if (timeLeft <= 0) {
           clearInterval(questionTimer);
-          submitMathAnswer(null); // Masa tamat
+          submitMathAnswer(null);
         }
       }, 1000);
     }
@@ -711,7 +1470,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       }
     }
 
-    // --- PERGERAKAN BIDAK, TANGGA & ULAR ---
     async function movePlayerSteps(playerIdx, steps) {
       isMoving = true;
       updateTurnUI();
@@ -727,7 +1485,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         }
       }
 
-      // Semak Tangga
       if (LADDERS[player.pos]) {
         const target = LADDERS[player.pos];
         playLadderSound();
@@ -738,9 +1495,7 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         player.score += 30;
         renderPlayerTokens();
         renderScoreboards();
-      }
-      // Semak Ular
-      else if (SNAKES[player.pos]) {
+      } else if (SNAKES[player.pos]) {
         const target = SNAKES[player.pos];
         playSnakeSound();
         spawnFloatingText(player.pos, 'DIPATUK ULAR! 🐍', '#ef4444');
@@ -753,7 +1508,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
 
       isMoving = false;
 
-      // Semak Kemenangan
       if (player.pos >= 100) {
         player.pos = 100;
         player.score += 200;
@@ -790,7 +1544,6 @@ gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
       document.getElementById('diceSumText').innerHTML = 'Jumlah Langkah: <span class="text-blue-600 text-lg">?</span>';
     }
 
-    // --- KESAN VISUAL, KEMENANGAN & RESET ---
     function spawnFloatingText(cellNum, text, color) {
       const container = document.getElementById('particleContainer');
       const center = getCellCenter(cellNum);
